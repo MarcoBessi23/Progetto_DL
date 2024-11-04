@@ -5,6 +5,7 @@ env/
 # Ignora file temporanei di sistema
 .DS_Store
 Thumbs.db
+myBackProp.py
 
 # Ignora i file compilati di Python
 __pycache__/
