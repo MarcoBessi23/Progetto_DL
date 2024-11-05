@@ -111,28 +111,30 @@ def RMD(w, v, loss, f, gammas, alphas, T, batches):
     num_epochs = int(T/len(batches)) + 1
     gradient = grad(loss)
     iters = list(zip(range(T), alphas, gammas, batches * num_epochs))
+    learning_curve = []
     
+    #forward
     for _, alpha, gamma, batch in iters:
         g = gradient(W.val, batch)
         V.mul(gamma)
         V.sub((1-gamma)*g)
         W.add(alpha*V.val)
+        learning_curve.append(loss(W.val, batches.all_idxs))
     
-    print('calcolo dw')
+    final_loss = loss(W.val, batches.all_idxs)
+    final_param = W.val
+
     l_grad = grad(f)
     d_w = l_grad(W.val,batches.all_idxs)
-    print('calcolo hyper grad')
     hyper_gradient =grad(lambda w, idx, d: np.dot(gradient(w,idx),d))
-    print(np.shape(d_w))
-
+    
     d_alpha = []
     d_gamma = []
     d_v = np.zeros_like(w)
 
-    
-    #backprop
+
+    #backprop 
     for t, alpha, gamma, batch in iters[::-1]:
-        print('inizio a calcolare la backprop degli iperparametri')
         print(f'backprop passo {t}')
         d_alpha.append(np.dot(d_w,V.val))
 
@@ -144,20 +146,22 @@ def RMD(w, v, loss, f, gammas, alphas, T, batches):
         V.add((1-gamma)*g)
         V.div(gamma)
 
-        print(np.shape(d_w))
-        
-        print('aggiorno dv')
         d_v += alpha*d_w
-        print('aggiungo a gamma')
         d_gamma.append(np.dot(d_v,v+g))
-        print('aggiorno dw')
         d_w -= (1-gamma)*hyper_gradient(w, batch, d_v)
         d_v *= gamma
     
     d_alpha = np.array(d_alpha)
     d_gamma = np.array(d_gamma)
+ 
+    return {'learning curve': learning_curve,
+            'loss':final_loss,
+            'param': final_param,
+            'hg_w':d_w,
+            'hg_v': d_v,
+            'hg_gamma':d_gamma,
+            'hg_alpha':d_alpha   }
 
-    return d_w, d_v, d_gamma, d_alpha
 
 #np.random.seed(42)
 #v = np.random.rand(5)

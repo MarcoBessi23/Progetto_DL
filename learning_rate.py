@@ -2,11 +2,11 @@ import numpy as np
 from hyperoptimizer import *
 from neuralNet import *
 from dataloader import load_mnist
-from memory_profiler import memory_usage
-import sys
 import autograd.numpy.random as npr
 from autograd import grad
 from autograd.util import quick_grad_check
+import matplotlib.pyplot as plt
+from time import time
 # Model parameters
 
 layer_sizes = [784, 50, 50, 10]
@@ -17,10 +17,10 @@ L2_reg = 0
 param_scale = 0.1
 batch_size = 250
 num_epochs = 20
-step_size = 0.001
+meta_step_size = 0.001
 mass = 0.8
 N_data = 10000
-meta_iter = 50
+meta_iter = 4
 log_param_scale = -2.0
 velocity_scale = 0.0
 
@@ -45,18 +45,25 @@ gammas = np.full(N_iter, gamma_0)
 def indexed_loss_fun(w, idxs):
     return loss(w, inputs = train_images[idxs], T = train_labels[idxs])
 
-print(np.shape(train_labels[:25,:]))
-loss(W0, train_images[:25,:], train_labels[:25,:])
-
-gradient = grad(loss)
-
 from autograd.test_util import check_grads
 
-# check reverse-mode to second order
-#check_grads(loss, modes=['rev'], order=2)(W0, train_images[:25,:], train_labels[:25,:])
+out = []
+meta_iteration = [i for i in range(meta_iter)]
+print(meta_iteration)
 
-#g = gradient(W0, train_images[:25,:], train_labels[:25,:])
-#print(np.shape(g))
+start = time()
 for i in range(meta_iter):
     print(f'meta iter number {i}')
-    d_w, d_v, d_gamma, d_alpha = RMD(W0, V0, indexed_loss_fun, indexed_loss_fun, gammas, np.exp(log_alphas), N_iter, batch_idxs)
+    res = RMD(W0, V0, indexed_loss_fun, indexed_loss_fun, gammas, np.exp(log_alphas), N_iter, batch_idxs)
+    hyper_g = np.exp(log_alphas) * res['hg_alpha']
+    log_alphas = log_alphas + meta_step_size * hyper_g
+    
+    out.append(res['loss']) 
+
+end = time()-start
+print(f'time of HPO: {end}')
+
+plt.plot(meta_iteration, out, marker='o')
+plt.xlabel('meta iteration')
+plt.ylabel('final loss')
+plt.show()
