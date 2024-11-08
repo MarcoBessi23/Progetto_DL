@@ -1,15 +1,14 @@
 import numpy as np
 from autograd import grad
 from fractions import Fraction
-
+from collections import deque
+from time import time
 
 RADIX_SCALE = 2**52
 
 class BitStore(object):
     """Efficiently stores information with non-integer number of bits (up to 16)."""
     def __init__(self, length:int):
-        # Use an array of Python 'long' ints which conveniently grow
-        # as large as necessary. It's about 50X slower though...
         self.store = np.array([0] * length, dtype=object)
 
     def push(self, N:int, M:int):
@@ -59,22 +58,28 @@ class ExactRep(object):
         n, d = self.float_to_rational(a)
         self.rational_mul(d, n)
 
-    #def float_to_rational(self, a):
-    #    assert a > 0.0
-    #    d = 2**16 // int(a + 1)  #// instead of / because d must have type int
-    #    n = int(a * d + 1)
-    #    print(n)
-    #    print(d)
-    #    return  n, d
-
-
     def float_to_rational(self, a):
         assert a > 0.0
-        frac = Fraction(a).limit_denominator(65536)
-        return frac.numerator, frac.denominator
+        d = 2**16 // int(a + 1)  #// instead of / because d must have type int
+        n = int(a * d + 1)
+        return  n, d
+
+
+    #def float_to_rational(self, a):
+    #    assert a > 0.0
+    #    frac = Fraction(a).limit_denominator(65536)
+    #    return frac.numerator, frac.denominator
 
     def float_to_intrep(self, x):
-        return (x * RADIX_SCALE).astype(np.int64)
+        val = x*RADIX_SCALE
+        if np.isnan(val).any() or np.isinf(val).any():
+            print("Valori non validi trovati in x_scaled")
+            print("Indice dei valori NaN:", np.where(np.isnan(val)))
+            print("Indice dei valori inf:", np.where(np.isinf(val)))
+            print("Valori problematici:", x[np.isnan(val) | np.isinf(val)])
+            raise ValueError("Valori non validi in x_scaled")
+        
+        return val.astype(np.int64)   #(x * RADIX_SCALE).astype(np.int64)
 
     @property
     def val(self):
@@ -104,42 +109,39 @@ def RMD(w, v, loss, f, gammas, alphas, T, batches):
     output:
     The gradient of validation function wrt the initial w and v, gammas and alphas
     '''
-    
+
     W = ExactRep(w)
     V = ExactRep(v)
-    
     num_epochs = int(T/len(batches)) + 1
     gradient = grad(loss)
     iters = list(zip(range(T), alphas, gammas, batches * num_epochs))
     learning_curve = []
-    
+
     #forward
-    for _, alpha, gamma, batch in iters:
+    for i, alpha, gamma, batch in iters:
+        print(f'forward iteration {i}')
         g = gradient(W.val, batch)
         V.mul(gamma)
         V.sub((1-gamma)*g)
         W.add(alpha*V.val)
         learning_curve.append(loss(W.val, batches.all_idxs))
-    
+
     final_loss = loss(W.val, batches.all_idxs)
     final_param = W.val
 
     l_grad = grad(f)
     d_w = l_grad(W.val,batches.all_idxs)
-    hyper_gradient =grad(lambda w, idx, d: np.dot(gradient(w,idx),d))
-    
-    d_alpha = []
-    d_gamma = []
-    d_v = np.zeros_like(w)
+    hyper_gradient = grad(lambda w, idx, d: np.dot(gradient(w,idx),d))
 
+    d_alpha = deque()
+    d_gamma = deque()
+    d_v = np.zeros_like(w)
 
     #backprop 
     for t, alpha, gamma, batch in iters[::-1]:
-        print(f'backprop passo {t}')
-        d_alpha.append(np.dot(d_w,V.val))
+        print(f'backprop step {t}')
+        d_alpha.appendleft(np.dot(d_w,V.val))
 
-        v = V.val
-        w = W.val
         #exact gradient descent reversion
         g = gradient(W.val, batch)
         W.sub(alpha*V.val)
@@ -147,13 +149,13 @@ def RMD(w, v, loss, f, gammas, alphas, T, batches):
         V.div(gamma)
 
         d_v += alpha*d_w
-        d_gamma.append(np.dot(d_v,v+g))
-        d_w -= (1-gamma)*hyper_gradient(w, batch, d_v)
+        d_gamma.appendleft(np.dot(d_v,V.val+g))
+        d_w -= (1-gamma)*hyper_gradient(W.val, batch, d_v)
         d_v *= gamma
-    
+
     d_alpha = np.array(d_alpha)
     d_gamma = np.array(d_gamma)
- 
+
     return {'learning curve': learning_curve,
             'loss':final_loss,
             'param': final_param,
@@ -161,7 +163,6 @@ def RMD(w, v, loss, f, gammas, alphas, T, batches):
             'hg_v': d_v,
             'hg_gamma':d_gamma,
             'hg_alpha':d_alpha   }
-
 
 #np.random.seed(42)
 #v = np.random.rand(5)

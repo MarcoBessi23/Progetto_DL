@@ -95,9 +95,9 @@ def make_nn_funs(layer_specs, L2_reg):
         return cur_units - logsumexp(cur_units, axis=1)
 
     def loss(W_vect, inputs, T):
-        log_prior = -L2_reg * np.dot(W_vect, W_vect)
+        log_prior = L2_reg * np.dot(W_vect, W_vect)
         log_lik = np.sum(predictions(W_vect, inputs) * T) / inputs.shape[0]
-        return - log_prior - log_lik
+        return  -log_lik + log_prior
 
     return parser.N, predictions, loss
 
@@ -111,7 +111,7 @@ class MLP_layer:
         weights = self.parser.get(param_vector, "weights")
         biases = self.parser.get(param_vector, "biases")
         
-        return self.nonlinearity(np.dot(inputs,weights)+ biases)
+        return self.nonlinearity(np.dot(inputs, weights) + biases)
     
     def build_weights_dict(self):
         
@@ -123,6 +123,3 @@ class MLP_layer:
 class tanh_layer(MLP_layer):
     def nonlinearity(self, x):
         return np.tanh(x)
-
-
-layer_specs = [tanh_layer(784,50),tanh_layer(50,50),tanh_layer(50,10)]
