@@ -239,3 +239,73 @@ def multi_RMD(w, v, parser, loss, f, gammas, alphas, T, batches):
             'hg_v': d_v,
             'hg_gamma':d_gamma,
             'hg_alpha':d_alpha   }
+
+
+def L2_RMD(w, v, L2, loss, f, gammas, alphas, T, batches):
+
+    '''
+    SGD with momentum and reverse mode differentiation
+    input:
+    w: model parameter
+    v: velocity parameter
+    loss: training loss
+    f: validation loss
+    alphas: step size hypers
+    gammas: velocity update hyper
+    theta: regularization hyper
+    T: total number of iterations
+    output:
+    The gradient of validation function wrt the initial w and v, gammas and alphas
+    '''
+
+    W = ExactRep(w)
+    V = ExactRep(v)
+    num_epochs = int(T/len(batches)) + 1
+    gradient = grad(loss)
+    iters = list(zip(range(T), alphas, gammas, batches * num_epochs))
+    learning_curve = []
+
+    #forward
+    for i, alpha, gamma, batch in iters:
+        print(f'forward iteration {i}')
+        g = gradient(W.val, batch)
+        V.mul(gamma)
+        V.sub((1-gamma)*g)
+        W.add(alpha*V.val)
+        learning_curve.append(loss(W.val, batches.all_idxs))
+
+    final_loss = loss(W.val, batches.all_idxs)
+    final_param = W.val
+
+    l_grad = grad(f)
+    d_w = l_grad(W.val, batches.all_idxs)
+    hyper_gradient = grad(lambda w, idx, d: np.dot(gradient(w,idx),d))
+    
+    
+    d_v = np.zeros_like(w)
+    d_L2 = np.zeros_like(w)
+
+
+    #backprop 
+    for t, alpha, gamma, batch in iters[::-1]:
+        print(f'backprop step {t}')
+    
+        #exact gradient descent reversion
+        g = gradient(W.val, batch)
+        W.sub(alpha*V.val)
+        V.add((1-gamma)*g)
+        V.div(gamma)
+
+        d_v += alpha*d_w
+        d_w -= (1-gamma)*hyper_gradient(W.val, batch, d_v)
+        d_L2 -= (1-gamma)*hyper_gradient(W.val, batch, d_v)
+        d_v *= gamma
+
+
+
+    return {'learning curve': learning_curve,
+            'loss':final_loss,
+            'param': final_param,
+            'hg_w':d_w,
+            'hg_v': d_v,
+            }

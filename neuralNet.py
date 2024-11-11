@@ -53,6 +53,39 @@ def construct_nn(layer_sizes:list):
     return parser, nn, loss
 
 
+def construct_nn_reg(layer_sizes:list):
+    '''
+    function to build neural network for L2 regularization
+    '''
+    parser = Weight_Parser()
+    layers = zip(layer_sizes[:-1],layer_sizes[1:])
+    m = len(layer_sizes)-1
+
+    for i,l in enumerate(layers):
+            parser.add(('mat',i),l)
+            parser.add(('bias',i),l[1])
+
+    def nn(w:np.ndarray, inputs:np.ndarray) -> float:
+        
+        for i in range(m):
+            weight_matrix = parser.get(('mat',i),w)
+            b = parser.get(('bias',i),w)
+            outputs = np.dot(inputs,weight_matrix) + b
+            inputs = np.tanh(outputs)
+
+        return inputs - logsumexp(inputs, axis=0, keepdims=True)
+
+    def loss(w:np.ndarray, L2_reg: np.ndarray, inputs:np.ndarray, targets:np.ndarray):
+        log_lik = np.sum(nn(w, inputs) * targets)/inputs.shape[0]
+        prior = np.dot(L2_reg*w,w)
+        return -log_lik - prior
+
+
+    return parser, nn, loss
+
+
+
+
 #class WeightsParser(object):
 #    def __init__(self):
 #        self.idxs_and_shapes = {}
