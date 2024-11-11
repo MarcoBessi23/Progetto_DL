@@ -13,7 +13,7 @@ class BitStore(object):
 
     def push(self, N:int, M:int):
         """Stores integer N, given that 0 <= N < M"""
-        assert M <= 2**16
+        assert np.all(M <= 2**16)
         self.store *= M
         self.store += N
 
@@ -58,15 +58,19 @@ class ExactRep(object):
         n, d = self.float_to_rational(a)
         self.rational_mul(d, n)
 
+    #def float_to_rational(self, a):
+    #    d = 2**16 // int(a + 1)  #// instead of / because d must have type int
+    #    n = int(a * d + 1)
+    #    return  n, d
+
     def float_to_rational(self, a):
-        assert a > 0.0
-        d = 2**16 // int(a + 1)  #// instead of / because d must have type int
-        n = int(a * d + 1)
+        assert np.all(a > 0.0)
+        d = 2**16 // np.fix(a+1).astype(int) # Uglier than it used to be: np.int(a + 1)
+        n = np.fix(a * d + 1).astype(int)
         return  n, d
 
-
     #def float_to_rational(self, a):
-    #    assert a > 0.0
+    #    assert np.all(a > 0.0)
     #    frac = Fraction(a).limit_denominator(65536)
     #    return frac.numerator, frac.denominator
 
@@ -164,18 +168,74 @@ def RMD(w, v, loss, f, gammas, alphas, T, batches):
             'hg_gamma':d_gamma,
             'hg_alpha':d_alpha   }
 
-#np.random.seed(42)
-#v = np.random.rand(5)
-#print(v)
-#gamma = 2.123
-#V = ExactRep(v)
-#print(V)
-#
-#V.mul(gamma)
-#print('valore di V dopo moltiplicazione:')
-#print(V.val)
-#print('valore di v per gamma:')
-#print(v*gamma)
-#print('valore di v per gamma approssimato a razionale:')
-#g = 46377/21845
-#print(v*g)
+def load_alpha(parser, alpha):
+    index_shape_vec = parser.shape_idx
+    cur_alpha = np.zeros(parser.N)
+    for i, (val1, _) in enumerate(index_shape_vec.values()):
+        cur_alpha[val1] = alpha[i]
+    return cur_alpha
+
+
+def multi_RMD(w, v, parser, loss, f, gammas, alphas, T, batches):
+    '''
+    Version of RMD in which learning rate has shape like neural network parameters
+    '''
+    W = ExactRep(w)
+    V = ExactRep(v)
+    num_epochs = int(T/len(batches)) + 1
+    gradient = grad(loss)
+    iters = list(zip(range(T), alphas, gammas, batches * num_epochs))
+    learning_curve = []
+
+    #forward
+    for i, alpha, gamma, batch in iters:
+        print(f'forward iteration {i}')
+        g = gradient(W.val, batch)
+        cur_alpha = load_alpha(parser, alpha)
+        cur_gamma = load_alpha(parser, gamma)
+        V.mul(cur_gamma)
+        V.sub((1-cur_gamma)*g)
+        W.add(cur_alpha * V.val)
+        learning_curve.append(loss(W.val, batches.all_idxs))
+
+    final_loss = loss(W.val, batches.all_idxs)
+    final_param = W.val
+
+    l_grad = grad(f)
+
+    d_w = l_grad(W.val,batches.all_idxs)
+    hyper_gradient = grad(lambda w, idx, d: np.dot(gradient(w,idx),d))
+
+    d_alpha, d_gamma = np.zeros(alphas.shape), np.zeros(gammas.shape)
+    d_v = np.zeros_like(w)
+
+    #backprop
+    for i, alpha, gamma, batch in iters[::-1]:
+        print(f'backprop step {i}')
+        cur_alpha = load_alpha(parser, alpha)
+        cur_gamma = load_alpha(parser, gamma)
+        for j, (ixs, _) in enumerate(parser.shape_idx.values()):
+                d_alpha[i,j] = np.dot(d_w[ixs], V.val[ixs])
+
+        #exact gradient descent reversion
+        g = gradient(W.val, batch)
+        W.sub(cur_alpha * V.val)
+        V.add((1-cur_gamma)*g)
+        V.div(cur_gamma)
+
+        d_v += cur_alpha*d_w
+        for j, (ixs, _) in enumerate(parser.shape_idx.values()):
+                d_gamma[i,j] = np.dot(d_v[ixs], V.val[ixs] + g[ixs])
+        #d_gamma[i] = np.dot(d_v,V.val+g)
+        d_w -= (1-cur_gamma)*hyper_gradient(W.val, batch, d_v)
+        d_v *= cur_gamma
+
+        print('end backprop')
+
+    return {'learning curve': learning_curve,
+            'loss':final_loss,
+            'param': final_param,
+            'hg_w':d_w,
+            'hg_v': d_v,
+            'hg_gamma':d_gamma,
+            'hg_alpha':d_alpha   }
