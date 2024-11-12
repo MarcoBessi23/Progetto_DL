@@ -279,9 +279,10 @@ def L2_RMD(w, v, L2, loss, f, gammas, alphas, T, batches):
 
     l_grad = grad(f)
     d_w = l_grad(W.val, batches.all_idxs)
-    hyper_gradient = grad(lambda w, idx, d: np.dot(gradient(w,idx),d))
-    
-    
+    fun = lambda w, idx, d: np.dot(gradient(w,idx),d)
+    hyper_gradient_w = grad(fun, 0)
+    hyper_gradient_L2 = grad(fun, 1)
+
     d_v = np.zeros_like(w)
     d_L2 = np.zeros_like(w)
 
@@ -297,8 +298,8 @@ def L2_RMD(w, v, L2, loss, f, gammas, alphas, T, batches):
         V.div(gamma)
 
         d_v += alpha*d_w
-        d_w -= (1-gamma)*hyper_gradient(W.val, batch, d_v)
-        d_L2 -= (1-gamma)*hyper_gradient(W.val, batch, d_v)
+        d_w -= (1-gamma)*hyper_gradient_w(W.val, L2, batch, d_v)
+        d_L2 -= (1-gamma)*hyper_gradient_L2(W.val, L2, batch, d_v)
         d_v *= gamma
 
 
