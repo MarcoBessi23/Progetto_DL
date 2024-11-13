@@ -20,27 +20,45 @@ N, train_images, train_labels, test_images, test_labels = load_mnist()
 train_images = train_images[:N_data, :]
 train_labels = train_labels[:N_data, :]
 batch_idxs = BatchList(N_data, batch_size)
+alpha_0 = 1.0
+gamma_0 = 0.9
+N_iter = 5
+alphas = np.full(N_iter, alpha_0)
+gammas = np.full(N_iter, gamma_0)
+
 
 parser, nn, loss = construct_nn_reg(layer_sizes)
+npr.seed(1)
+
 num_parameters = parser.N
 W0 = np.random.randn(num_parameters)
-out = nn(W0, train_images[25,:])
-print(np.shape(out))
+V0 = np.zeros_like(W0)
 
-l_grad = grad(loss)
-d_w = l_grad(W0, L2_reg, train_images[25,:], train_labels[25,:] )
-print(np.shape(d_w))
-fun = lambda w, L2, t, l, d: np.dot(l_grad(w,L2,t,l),d)
-hyper_gradient = grad(fun, 0)
-hyper_theta = grad(fun, 1)
 
-d_v = np.zeros_like(W0)
-d_w = hyper_gradient(W0, L2_reg, train_images[25,:], train_labels[25,:], d_v)
-d_theta = hyper_theta(W0, L2_reg, train_images[25,:], train_labels[25,:], d_v)
-print(np.shape(d_w))
-print(np.shape(d_theta))
 
-#for i in range (meta_iter):
-#    res = L2_RMD()
-#    L2_reg = L2_reg - L2_step * hyper 
+
+#out = nn(W0, train_images[25,:])
+#print(np.shape(out))
+#l_grad = grad(loss)
+#d_w = l_grad(W0, L2_reg, train_images[25,:], train_labels[25,:] )
+#print(np.shape(d_w))
+#fun = lambda w, L2, t, l, d: np.dot(l_grad(w,L2,t,l),d)
+#hyper_gradient = grad(fun, 0)
+#hyper_theta = grad(fun, 1)
+
+#d_v = np.zeros_like(W0)
+#d_w = hyper_gradient(W0, L2_reg, train_images[25,:], train_labels[25,:], d_v)
+#d_theta = hyper_theta(W0, L2_reg, train_images[25,:], train_labels[25,:], d_v)
+#print(np.shape(d_w))
+#print(np.shape(d_theta))
+
+def indexed_loss_fun(w, L2_reg, idxs):
+    return loss(w, L2_reg, inputs = train_images[idxs], targets = train_labels[idxs])
+
+L2_step = 0.02
+
+for i in range (meta_iter):
+    res = L2_RMD(W0, V0, L2_reg, indexed_loss_fun, indexed_loss_fun, gammas, alphas, N_iter, batch_idxs)
+    hyper = res['hg_L2']
+    L2_reg = L2_reg - L2_step * hyper 
 

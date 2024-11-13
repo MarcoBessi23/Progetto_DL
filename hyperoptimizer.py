@@ -268,18 +268,26 @@ def L2_RMD(w, v, L2, loss, f, gammas, alphas, T, batches):
     #forward
     for i, alpha, gamma, batch in iters:
         print(f'forward iteration {i}')
-        g = gradient(W.val, batch)
+        g = gradient(W.val, L2, batch)
+        print('gradiente')
+        print(np.isnan(g).any())
         V.mul(gamma)
+        print('V1')
+        print(np.isnan(V.val).any())
         V.sub((1-gamma)*g)
+        print('V2')
+        print(np.isnan(V.val).any())
         W.add(alpha*V.val)
-        learning_curve.append(loss(W.val, batches.all_idxs))
+        print('W')
+        print(np.isnan(W.val).any())
+        learning_curve.append(loss(W.val, L2, batches.all_idxs))
 
-    final_loss = loss(W.val, batches.all_idxs)
+    final_loss = loss(W.val, L2, batches.all_idxs)
     final_param = W.val
 
     l_grad = grad(f)
-    d_w = l_grad(W.val, batches.all_idxs)
-    fun = lambda w, idx, d: np.dot(gradient(w,idx),d)
+    d_w = l_grad(W.val, L2, batches.all_idxs)
+    fun = lambda w, L2, idx, d: np.dot(l_grad(w, L2, idx),d)
     hyper_gradient_w = grad(fun, 0)
     hyper_gradient_L2 = grad(fun, 1)
 
@@ -292,10 +300,21 @@ def L2_RMD(w, v, L2, loss, f, gammas, alphas, T, batches):
         print(f'backprop step {t}')
     
         #exact gradient descent reversion
-        g = gradient(W.val, batch)
+        g = gradient(W.val, L2, batch)
+        print(np.isnan(g).any())
+        print('w')
         W.sub(alpha*V.val)
+        if np.isnan(W.val).any():
+            print('!!!!!!!!!!!!!!W.sub è causa')
+        print('V1')
         V.add((1-gamma)*g)
+        if np.isnan(V.val).any():
+            print('!!!!!!!!!!!!!!V.add è causa')
+        print('V2')
         V.div(gamma)
+        print(V.val)
+        if np.isnan(V.val).any():
+            print('!!!!!!!!!!!!!!V.div è causa')
 
         d_v += alpha*d_w
         d_w -= (1-gamma)*hyper_gradient_w(W.val, L2, batch, d_v)
@@ -309,4 +328,4 @@ def L2_RMD(w, v, L2, loss, f, gammas, alphas, T, batches):
             'param': final_param,
             'hg_w':d_w,
             'hg_v': d_v,
-            }
+            'hg_L2': d_L2}
