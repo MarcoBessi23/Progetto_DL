@@ -9,7 +9,8 @@ from time import time
 
 
 layer_sizes = [784,10]
-L2_reg = np.random.randn(7850)
+L2_init = np.exp(-6)
+L2_reg = np.full(7850, L2_init)
 batch_size = 250
 num_epochs = 20
 meta_lr = 40 #0.001
@@ -20,7 +21,7 @@ N, train_images, train_labels, test_images, test_labels = load_mnist()
 train_images = train_images[:N_data, :]
 train_labels = train_labels[:N_data, :]
 batch_idxs = BatchList(N_data, batch_size)
-alpha_0 = 1.0
+alpha_0 = 1
 gamma_0 = 0.9
 N_iter = 5
 alphas = np.full(N_iter, alpha_0)
@@ -28,10 +29,11 @@ gammas = np.full(N_iter, gamma_0)
 
 
 parser, nn, loss = construct_nn_reg(layer_sizes)
+#parser, nn, loss = construct_nn(layer_sizes)
 npr.seed(1)
 
 num_parameters = parser.N
-W0 = np.random.randn(num_parameters)
+W0 = np.zeros(num_parameters)#np.random.randn(num_parameters)
 V0 = np.zeros_like(W0)
 
 
@@ -39,26 +41,92 @@ V0 = np.zeros_like(W0)
 
 #out = nn(W0, train_images[25,:])
 #print(np.shape(out))
+#print('forma loss')
+#print(np.shape(loss(W0, L2_init, train_images[25,:], train_labels[25,:])))
 #l_grad = grad(loss)
-#d_w = l_grad(W0, L2_reg, train_images[25,:], train_labels[25,:] )
+#d_w = l_grad(W0, L2_init, train_images[25,:], train_labels[25,:] )
 #print(np.shape(d_w))
 #fun = lambda w, L2, t, l, d: np.dot(l_grad(w,L2,t,l),d)
 #hyper_gradient = grad(fun, 0)
 #hyper_theta = grad(fun, 1)
-
 #d_v = np.zeros_like(W0)
-#d_w = hyper_gradient(W0, L2_reg, train_images[25,:], train_labels[25,:], d_v)
-#d_theta = hyper_theta(W0, L2_reg, train_images[25,:], train_labels[25,:], d_v)
+#k = fun(W0, L2_init, train_images[25,:], train_labels[25,:], d_v)
+#print(np.shape(k))
+#d_w = hyper_gradient(W0, L2_init, train_images[25,:], train_labels[25,:], d_v)
+#d_theta = hyper_theta(W0, L2_init, train_images[25,:], train_labels[25,:], d_v)
 #print(np.shape(d_w))
 #print(np.shape(d_theta))
 
+
 def indexed_loss_fun(w, L2_reg, idxs):
+
     return loss(w, L2_reg, inputs = train_images[idxs], targets = train_labels[idxs])
 
-L2_step = 0.02
+L2_step = 100
+#def train_reg(reg_0, N_meta_iter):
+#        def hyperloss(reg ):
+#            w_vect_0 = npr.randn(num_parameters) 
+#            w_vect_final = L2_RMD(w_vect_0, V0, reg, indexed_loss_fun, indexed_loss_fun, gammas, alphas, N_iter, batch_idxs )
+#            return indexed_loss_fun(w_vect_final, reg, batch_idxs)
+#        hypergrad = grad(hyperloss)
+#        cur_reg = reg_0
+#        for _ in range(N_meta_iter):
+#            raw_grad = hypergrad(cur_reg)
+#            #constrained_grad = constrain_reg(raw_grad, constraint)
+#            #print constrained_grad
+#            # cur_reg -= constrained_grad / np.abs(constrained_grad + 1e-8) * meta_alpha
+#            cur_reg -= raw_grad * L2_step
+#
+#train_reg(L2_reg, 5)
 
-for i in range (meta_iter):
-    res = L2_RMD(W0, V0, L2_reg, indexed_loss_fun, indexed_loss_fun, gammas, alphas, N_iter, batch_idxs)
-    hyper = res['hg_L2']
-    L2_reg = L2_reg - L2_step * hyper 
+def train_nn(w, L2, loss, f, gammas, alphas, T, batches):
+    W = ExactRep(w)
+    V = ExactRep(np.zeros_like(w))
+    num_epochs = int(T/len(batches)) + 1
+    gradient = grad(loss)
+    iters = list(zip(range(T), alphas, gammas, batches * num_epochs))
+    
+    #forward
+    for i, alpha, gamma, batch in iters:
+        print(f'forward iteration {i}')
+        g = gradient(W.val, L2, batch)
+        print(type(g))
+        #print('gradiente')
+        #print(np.max(g))
+        #print(np.isnan(g).any())
+        V.mul(gamma)
+        #print('V1')
+        #print(np.isnan(V.val).any())
+        V.sub((1-gamma)*g)
+        #print('V2')
+        #print(np.isnan(V.val).any())
+        W.add(alpha*V.val)
+    
+    return W.val 
+
+
+def train_reg(reg_0, N_meta_iter):
+        def hyperloss(reg ):
+            w_vect_0 = npr.randn(num_parameters) 
+            w_vect_final = train_nn(w_vect_0, reg, indexed_loss_fun, indexed_loss_fun, gammas, alphas, N_iter, batch_idxs )
+            return indexed_loss_fun(w_vect_final, reg, batch_idxs)
+        hypergrad = grad(hyperloss)
+        cur_reg = reg_0
+        for _ in range(N_meta_iter):
+            raw_grad = hypergrad(cur_reg)
+            #constrained_grad = constrain_reg(raw_grad, constraint)
+            #print constrained_grad
+            # cur_reg -= constrained_grad / np.abs(constrained_grad + 1e-8) * meta_alpha
+            cur_reg -= raw_grad * L2_step
+
+train_reg(L2_reg, 5)
+
+#L2_step = 100
+#for i in range (meta_iter):
+#
+#    res = L2_RMD(W0, V0, L2_reg, indexed_loss_fun, indexed_loss_fun, gammas, alphas, 
+#                 N_iter, batch_idxs,only_forward = False)
+#    hyper = res['hg_L2']    
+#    L2_reg = L2_reg - L2_step * hyper
+#    print(f' valore di L2 dopo meta iter {L2_reg}') 
 

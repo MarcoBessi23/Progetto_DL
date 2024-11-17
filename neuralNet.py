@@ -42,9 +42,9 @@ def construct_nn(layer_sizes:list):
             outputs = np.dot(inputs,weight_matrix) + b
             inputs = np.tanh(outputs)
 
-        return inputs - logsumexp(inputs, axis=0, keepdims=True)
+        return inputs - logsumexp(inputs, axis=1, keepdims=True)
     
-    def loss(w:np.ndarray, inputs:np.ndarray, targets:np.ndarray, L2_reg:float):
+    def loss(w:np.ndarray, inputs:np.ndarray, targets:np.ndarray, L2_reg:float = 0 ):
         log_lik = np.sum(nn(w, inputs) * targets)/inputs.shape[0]
         prior = L2_reg*np.dot(w,w)
         return -log_lik - prior
@@ -69,16 +69,23 @@ def construct_nn_reg(layer_sizes:list):
         
         for i in range(m):
             weight_matrix = parser.get(('mat',i),w)
-            b = parser.get(('bias',i),w)
+            b = parser.get(('bias', i), w)
+            b = 0.0
             outputs = np.dot(inputs,weight_matrix) + b
-            inputs = np.tanh(outputs)
+            # Apply tanh activation to hidden layers only
+            if i < m - 1:
+                inputs = np.tanh(outputs)
+            else:
+                # Linear output layer
+                inputs = outputs
+            
+        return inputs - logsumexp(inputs, axis=1, keepdims=True)
 
-        return inputs - logsumexp(inputs, axis=0, keepdims=True)
-
+    
     def loss(w:np.ndarray, L2_reg: np.ndarray, inputs:np.ndarray, targets:np.ndarray):
         log_lik = np.sum(nn(w, inputs) * targets)/inputs.shape[0]
-        prior = np.dot(L2_reg*w,w)
-        return -log_lik - prior
+        prior = np.dot(L2_reg * w, w)
+        return -log_lik + prior #negative log likelihood + regularization prior
 
 
     return parser, nn, loss
