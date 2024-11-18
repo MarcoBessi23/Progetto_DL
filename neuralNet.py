@@ -47,7 +47,7 @@ def construct_nn(layer_sizes:list):
     def loss(w:np.ndarray, inputs:np.ndarray, targets:np.ndarray, L2_reg:float = 0 ):
         log_lik = np.sum(nn(w, inputs) * targets)/inputs.shape[0]
         prior = L2_reg*np.dot(w,w)
-        return -log_lik - prior
+        return -log_lik + prior
 
 
     return parser, nn, loss

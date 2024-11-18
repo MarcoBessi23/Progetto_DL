@@ -18,7 +18,7 @@ val_images = train_images[:N_data, :]
 val_labels = train_labels[:N_data, :]
 print(type(val_images[0]))
 print(type(val_labels[0]))
-train_data = np.ones((10,784))
+train_data = np.zeros((10,784))
 train_labels = np.eye(10)
 print(type(train_data[0]))
 print(type(train_labels[0]))
@@ -29,7 +29,7 @@ batch_idxs = BatchList(N_train_image, batch_size) #10 is the number of data for 
 print(batch_idxs)
 alpha_0 = 0.5
 gamma_0 = 0.9
-N_iter = 5
+N_iter = 10
 alphas = np.full(N_iter, alpha_0)
 gammas = np.full(N_iter, gamma_0)
 
@@ -39,13 +39,14 @@ parser, nn, loss = construct_nn(layer_sizes)
 #parser, nn, loss = construct_nn(layer_sizes)
 npr.seed(1)
 
-w0 = npr.randn(parser.N)
-v0 = npr.randn(parser.N)
+log_param_scale = -2
+w0 = npr.randn(parser.N) * np.exp(log_param_scale)
+v0 = np.zeros(parser.N)
 
 def indexed_loss_fun(w, meta_params, idxs):   # To be optimized by SGD.
-    return loss(w, inputs = meta_params[idxs], targets =  train_labels[idxs])
+    return loss(w, inputs = meta_params[idxs], targets =  train_labels[idxs], L2_reg = L2_init)
 def meta_loss_fun(w):                         # To be optimized in the outer loop.
-    return loss(w, inputs = val_images, targets = val_labels)
+    return loss(w, inputs = val_images, targets = val_labels, L2_reg= L2_init)
 
 for idx in batch_idxs:
     print(np.shape(train_data[idx]))
@@ -65,16 +66,17 @@ output = []
 for i in range(meta_iter):
     print(f"Meta iteration {i}")
     results = data_RMD(w = w0, v = v0, L2 = L2_init, loss = indexed_loss_fun, 
-                       f = meta_loss_fun, gammas = gammas, alphas = alphas, 
-                       T = 10, batches = batch_idxs, meta = train_data)
-    learning_curve = results['learning_curve']
-    output.append((learning_curve, train_data))
-    train_data -= results['hL_data'] * data_stepsize   # Update data with one gradient step.
+                       f = meta_loss_fun, gammas = gammas, alphas = np.exp(alphas), 
+                       T = N_iter, batches = batch_idxs, meta = train_data)
+    
+    if i== meta_iter-1:
+        learning_curve = results['learning_curve']
+        output.append((learning_curve, train_data))
+    train_data -= results['hM_data'] * data_stepsize   # Update data with one gradient step.
 
 
 
 import matplotlib.pyplot as plt
-import pickle
 import matplotlib
 
 
@@ -85,10 +87,10 @@ fig.clf()
 N_figs = 2
 
 
-
 ax = fig.add_subplot(N_figs, 1, 1)
 ax.set_title("Learning Curve")
 for i, log_alphas in enumerate(all_learning_curves):
+    print(i)
     ax.plot(log_alphas, 'o-')
 ax.set_ylabel("Loss")
 ax.set_xlabel("Step number")

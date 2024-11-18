@@ -345,8 +345,11 @@ def data_RMD(w, v, L2, loss, f , gammas, alphas, T, batches, meta):
 
     W = ExactRep(w)
     V = ExactRep(v)
+
+    iter_per_epoch = len(batches)
     num_epochs = int(T/len(batches)) + 1
-    iters = list(zip(range(T), alphas, gammas, batches))
+    iters = list(zip(range(T), alphas, gammas, batches*num_epochs))
+    
     learning_curve = []
     validation_curve = []
     L_grad      = grad(loss)    # Gradient wrt parameters.
@@ -357,14 +360,14 @@ def data_RMD(w, v, L2, loss, f , gammas, alphas, T, batches, meta):
                       np.dot(L_grad(w, meta, idxs), d))    # Hessian-vector product.
     L_hvp_meta = grad(lambda w, meta, d, idxs:
                       np.dot(L_grad(w, meta, idxs), d), 1) # Returns a size(meta) output.
-
+    learning_curve = [loss(W.val, meta, batches.all_idxs)]
     #forward
     for i, alpha, gamma, batch in iters:
         print(f'forward iteration {i}')
         g = L_grad(W.val, meta, batch)
         V.mul(gamma)
         V.sub((1-gamma)*g)
-        W.add(alpha*V.val)
+        W.add(alpha*V.val)        
         learning_curve.append(loss(W.val, meta, batches.all_idxs))
         validation_curve.append(loss(W.val, meta, batches.all_idxs))
 
@@ -372,8 +375,10 @@ def data_RMD(w, v, L2, loss, f , gammas, alphas, T, batches, meta):
     final_params = W.val
     dL_w = L_grad(W.val, meta, batches.all_idxs)
     dL_v = np.zeros(dL_w.shape)
-    #dM_w = M_grad(W.val)            #maybe you have to change meta_loss to take meta as a variable
+    dM_w = M_grad(W.val)            #maybe you have to change meta_loss to take meta as a variable
+    dM_v = np.zeros(dL_w.shape)
     dL_data = L_meta_grad(W.val, meta, batches.all_idxs)
+    dM_data = np.zeros(dL_data.shape)
     #dM_data = M_meta_grad(W.val)    #same as above
 
     for i, alpha, gamma, batch in iters[::-1]:
@@ -385,13 +390,14 @@ def data_RMD(w, v, L2, loss, f , gammas, alphas, T, batches, meta):
         V.add((1-gamma) * g)
         V.div(gamma)
         dL_v += alpha * dL_w
-        #dM_v += alpha * dM_w
+        dM_v += alpha * dM_w
         dL_w -= (1-gamma)*L_hvp(W.val, dL_v, batch)
-        #dM_w -= (1-gamma)*L_hvp(W.val, L2, batch, dM_v)
+        dM_w -= (1-gamma)*L_hvp(W.val, dM_v, batch)
         dL_data -= (1-gamma)*L_hvp_meta(W.val, meta, dL_v, batch)
+        dM_data = (1-gamma)*L_hvp_meta(W.val, meta, dM_v, batch)
         #dM_data -= (1-gamma)*L_hvp_meta(W.val, L2, dM_v, batch)
         dL_v *= gamma
-        #dM_v *= gamma
+        dM_v *= gamma
     
     return {'learning_curve': learning_curve,
             'validation_curve': validation_curve,
@@ -399,7 +405,7 @@ def data_RMD(w, v, L2, loss, f , gammas, alphas, T, batches, meta):
             'param': final_params,
             'hL_w': dL_w,
             'hL_v': dL_v,
-            #'hM_w': dM_w,
-            #'hM_v': dM_v,
-            'hL_data': dL_data}
-            #'hM_data': dM_data}
+            'hM_w': dM_w,
+            'hM_v': dM_v,
+            'hL_data': dL_data,
+            'hM_data': dM_data }
