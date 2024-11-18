@@ -24,7 +24,6 @@ print(type(train_data[0]))
 print(type(train_labels[0]))
 
 
-
 batch_idxs = BatchList(N_train_image, batch_size) #10 is the number of data for the training of nn
 print(batch_idxs)
 alpha_0 = 0.5
