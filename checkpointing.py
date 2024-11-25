@@ -1,7 +1,6 @@
 import numpy as np
 from abc import ABCMeta
 from enum import IntEnum
-from storage import NumpyStorage
 import sys
 
 
