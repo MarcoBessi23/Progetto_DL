@@ -107,16 +107,15 @@ vengono aggiornati
 
 l_grad = grad(indexed_loss_fun) # nel nostro caso loss function e validation loss coincidono perché il paper
                                 # considera solo training data
-
 w_0 = np.random.randn(num_parameters) * np.exp(log_param_scale)
 v_0 = np.zeros_like(w_0)
 
 
 
-def forward(nfrom: int, nto: int):
+def forward(check:int, nfrom: int, nto: int):
 
-    w = snapStack[nfrom]['weights']
-    v = snapStack[nfrom]['velocity']
+    w = snapStack[check]['weights']
+    v = snapStack[check]['velocity']
 
     for t, alpha, gamma, batch in iters[nfrom:nto]:
         print(f'forward step number {t}')
@@ -158,32 +157,32 @@ def reverse(iteration, w, v, d_w, d_v, d_alpha, d_gamma):
     return d_w, d_v, d_alpha, d_gamma
 
 
-#w, v = w_0, v_0
-#while(True):
-#    action = scheduler.revolve()
-#    print(action)
-#    if action == ActionType.advance:
-#        print(f'advance the system from {scheduler.old_capo} to {scheduler.capo}')
-#        w, v = forward(scheduler.old_capo, scheduler.capo)
-#    elif action == ActionType.takeshot:
-#        print('saving current state')
-#        print(scheduler.check)
-#        snapStack[scheduler.check]['weights']  = w
-#        snapStack[scheduler.check]['velocity'] = v
-#    elif action == ActionType.firsturn:
-#        print('executing first reverse step')
-#        wF, vF = forward(scheduler.old_capo, nSteps)
-#        #initialise gradient values
-#        d_alpha, d_gamma = np.zeros(multi_alpha.shape), np.zeros(multi_gamma.shape)
-#        d_v = np.zeros_like(w_0)
-#        d_w = l_grad(wF, batch_idxs.all_idxs)  
-#        #first step
-#        d_w, d_v, d_alpha, d_gamma = reverse(nSteps-1, wF, vF, d_w, d_v, d_alpha, d_gamma)
-#    elif action == ActionType.restore:
-#        print(f'loading state number {scheduler.check}')
-#        w, v = snapStack[scheduler.check]['weights'], snapStack[scheduler.check]['velocity']
-#    elif action == ActionType.youturn:
-#        print(f' doing reverse step at time {scheduler.fine}')
-#        d_w, d_v, d_alpha, d_gamma = reverse(scheduler.fine, w, v, d_w, d_v, d_alpha, d_gamma)
-#    if action == ActionType.terminate:
-#        break
+w, v = w_0, v_0
+while(True):
+    action = scheduler.revolve()
+    print(action)
+    if action == ActionType.advance:
+        print(f'advance the system from {scheduler.oldcapo} to {scheduler.capo}')
+        w, v = forward(scheduler.check, scheduler.oldcapo, scheduler.capo)
+    elif action == ActionType.takeshot:
+        print('saving current state')
+        print(scheduler.check)
+        snapStack[scheduler.check]['weights']  = w
+        snapStack[scheduler.check]['velocity'] = v
+    elif action == ActionType.firsturn:
+        print('executing first reverse step')
+        wF, vF = forward(scheduler.check, scheduler.oldcapo, nSteps)
+        #initialise gradient values
+        d_alpha, d_gamma = np.zeros(multi_alpha.shape), np.zeros(multi_gamma.shape)
+        d_v = np.zeros_like(w_0)
+        d_w = l_grad(wF, batch_idxs.all_idxs)  
+        #first step
+        d_w, d_v, d_alpha, d_gamma = reverse(nSteps-1, wF, vF, d_w, d_v, d_alpha, d_gamma)
+    elif action == ActionType.restore:
+        print(f'loading state number {scheduler.check}')
+        w, v = snapStack[scheduler.check]['weights'], snapStack[scheduler.check]['velocity']
+    elif action == ActionType.youturn:
+        print(f' doing reverse step at time {scheduler.fine}')
+        d_w, d_v, d_alpha, d_gamma = reverse(scheduler.fine, w, v, d_w, d_v, d_alpha, d_gamma)
+    if action == ActionType.terminate:
+        break

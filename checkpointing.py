@@ -128,45 +128,33 @@ class Checkpoint:
 
 class Offline():
     '''
-    scheduler class to get action to take 
+    scheduler class to get action to take
+    self.check : number of checkpoints currently assigned
+    self.checkpoint.ch : ch list that indicates positions of assigned checkpoints
+    self.capo : position indicating the start of the subrange you are currently trying to reverse
+    self.fine : position indicating the end of the subrange you are currently trying to reverse
+    self.snaps : number of checkpoints you want to use with limit self.checkup
+
     '''    
     def __init__(self, sn, st, f=None):
-        self.snaps = sn
-        self.checkpoint = Checkpoint(sn)
         
+        self.snaps = sn
+        self.checkpoint = Checkpoint(sn)    
         self.steps = st
         self.check = -1
         self.info = 3
         self.fine = self.steps
         self.capo = 0
-        self.old_capo = 0
-        self.online = False
+        self.oldcapo = 0
         self.checkup = 100
         self.repsup = 1000
-        
-        # Calcolo di num_ch
-        for i in range(sn):
-            self.num_ch[i] = sum(
-                1 for j in range(sn) if self.checkpoint.ch[j] < self.checkpoint.ch[i]
-            )
-            
-            # Calcolo di ord_ch
-            for i in range(sn):
-                for j in range(sn):
-                    if self.num_ch[j] == i:
-                        self.checkpoint.ord_ch[i] = j
-                
 
-        self.__stored_ckps = []
-        self.checkpoint.advances = f - 1
         self.info = 3
-        # self.takeshots = online_obj.get_shots()  # Non implementato
-        # self.commands = online_obj.get_commands()  # Non implementato
         self.oldsnaps = sn
 
     def revolve(self):
         """
-        revolve scheduler to get to execute at a given point
+        revolve scheduler to get action to execute at a given point
         """
         self.checkpoint.commands += 1
 
@@ -186,17 +174,17 @@ class Offline():
                     print(f" commands: {self.checkpoint.commands:5}\n")
                 return ActionType.terminate
             else:
-                
 
-                self.capo = self.checkpoint.ch[self.check]
+                self.capo = self.checkpoint.ch[self.check] #capo diventa il numero che c'è dentro all'ultimo checkpoint
                 self.oldfine = self.fine
                 self.checkpoint.number_of_reads[self.check] += 1
                 return ActionType.restore
 
-        elif diff == 1:  # Primo passo combinato forward/reverse
+        elif diff == 1:  # passo combinato forward/reverse
             self.fine -= 1
             if self.check >= 0 and self.checkpoint.ch[self.check] == self.capo:
                 self.check -= 1
+            #controllo se è il primo passo di reverse 
             if self.turn == 0:
                 self.turn = 1
                 self.oldfine = self.fine
@@ -205,7 +193,7 @@ class Offline():
                 self.oldfine = self.fine
                 return ActionType.youturn
 
-        else:  # Passi normali
+        else:
             if self.check == -1:  # Inizializzazione
                 self.checkpoint.ch[0] = 0
                 self.check = 0
@@ -228,8 +216,8 @@ class Offline():
                 return ActionType.takeshot
 
             if self.checkpoint.ch[self.check] != self.capo:  # Takeshot
-                
-                self.check += 1
+
+                self.check += 1 #aggiungi un checkpoint
                 if self.check >= self.checkup or self.check + 1 > self.snaps:
                     self.info = 10 if self.check >= self.checkup else 11
                     return ActionType.error
@@ -246,7 +234,7 @@ class Offline():
                     return ActionType.error
 
                 self.oldcapo = self.capo #add checkpoints to the list
-                ds = self.snaps - (self.num_ch[self.check] if self.online else self.check)
+                ds = self.snaps - self.check #numero di checkpoint che posso ancora aggiungere
                 if ds < 1:
                     self.info = 11
                     return ActionType.error
@@ -266,7 +254,7 @@ class Offline():
                     return ActionType.error
 
                 bino1 = range_ * reps // (ds + reps)
-                bino2 = bino1 * ds // (ds + reps - 1) if ds > 1 else 1
+                bino2 = (bino1 * ds) // (ds + reps - 1) if ds > 1 else 1
                 bino3 = bino2 * (ds - 1) // (ds + reps - 2) if ds > 2 else (0 if ds == 1 else 1)
                 bino4 = bino2 * (reps - 1) // ds
                 bino5 = bino3 * (ds - 2) // reps if ds > 3 else (0 if ds < 3 else 1)
