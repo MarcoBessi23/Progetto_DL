@@ -76,7 +76,7 @@ print(num_epochs)
 nSnaps = adjust(nSteps)
 print('numero totale di checkpoint preparati')
 print(nSnaps)
-scheduler = Offline(nSnaps, nSteps)        #CRevolve(nSnaps, nSteps)
+scheduler = BinomialCKP(nSnaps, nSteps)        #CRevolve(nSnaps, nSteps)
 
 """
 nfrom è un checkpoint, deve permettermi di ricreare lo stato del modello a quella iterazione quindi ci devo 
@@ -96,6 +96,8 @@ dal primo batch, quindi coviene calcolarmi batches fuori e poi dentro allo zip m
 """
 
 iters = list(zip(range(nSteps), multi_alpha, multi_gamma, batch_idxs * num_epochs))
+
+print('passi forward')
 print(len(iters))
 
 #snapStack = [None]*nsnaps
@@ -158,12 +160,22 @@ def reverse(iteration, w, v, d_w, d_v, d_alpha, d_gamma):
 
 
 w, v = w_0, v_0
+
+
+
+
+
+
+i = 0
 while(True):
     action = scheduler.revolve()
     print(action)
     if action == ActionType.advance:
         print(f'advance the system from {scheduler.oldcapo} to {scheduler.capo}')
+        i += 1
         w, v = forward(scheduler.check, scheduler.oldcapo, scheduler.capo)
+        if i == 2:
+            break
     elif action == ActionType.takeshot:
         print('saving current state')
         print(scheduler.check)

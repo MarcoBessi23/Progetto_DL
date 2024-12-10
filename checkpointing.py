@@ -2,7 +2,7 @@ import numpy as np
 from abc import ABCMeta
 from enum import IntEnum
 import sys
-
+from math import comb
 
 """
 In the following I try to implement Hyper Grad without using the exact representation but
@@ -16,6 +16,23 @@ next checkpoint will be set
 """
 checkup = 10
 repsup = 64
+
+def beta(s : int, t : int):
+     ''' 
+     function that given s and t return the maximal number of steps that can be reversed with 
+     s checkpoints and a maximum of t forward steps from any of the states
+     '''
+     return comb(s + t, s)
+
+def num_steps(s, b):
+    t = 0
+    while True:
+        print(t)
+        if beta(s,t) >= b:
+            return t
+        t += 1
+
+
 
 def numforw(steps, snaps):
     """
@@ -45,7 +62,7 @@ def numforw(steps, snaps):
 
 def maxrange(ss, tt):
     
-    MAXINT = sys.maxsize  # Valore massimo per un intero (tipico `2**63 - 1` su sistemi a 64-bit)
+    MAXINT = sys.maxsize  # massimo valore per un intero (`2**63 - 1` su sistemi a 64-bit)
 
     if tt < 0 or ss < 0:
         print("Error in MAXRANGE: negative parameter")
@@ -65,18 +82,20 @@ def maxrange(ss, tt):
     ires = int(res) 
     return ires
 
-def adjust(steps):
-
+def adjust(n_iter):
+    ''' 
+    function to get an approximated optimal number of checkpoints to reverse 
+    '''
     snaps = 1
     reps = 1
     s = 0
 
-    # Primo ciclo: ridurre `s` finché maxrange supera `steps`
-    while maxrange(snaps + s, reps + s) > steps:
+    # Primo ciclo: ridurre `s` finché maxrange supera `n_iter`
+    while maxrange(snaps + s, reps + s) > n_iter:
         s -= 1
 
-    # Secondo ciclo: aumentare `s` finché maxrange è inferiore a `steps`
-    while maxrange(snaps + s, reps + s) < steps:
+    # Secondo ciclo: aumentare `s` finché maxrange è inferiore a `n_iter`
+    while maxrange(snaps + s, reps + s) < n_iter:
         s += 1
 
     # Aggiorna snaps e reps
@@ -84,8 +103,8 @@ def adjust(steps):
     reps += s
     s = -1
 
-    # Riduci snaps o reps finché maxrange è maggiore o uguale a `steps`
-    while maxrange(snaps, reps) >= steps:
+    # Riduci snaps o reps finché maxrange è maggiore o uguale a `n_iter`
+    while maxrange(snaps, reps) >= n_iter:
         if snaps > reps:
             snaps -= 1
             s = 0
@@ -119,14 +138,13 @@ class Checkpoint:
             snaps (int): Numero di snapshot da gestire.
         """
         self.ch = [0] * snaps
-        self.ord_ch = [0] * snaps
         self.number_of_reads = [0] * snaps
         self.number_of_writes = [0] * snaps
         self.takeshots = 0
         self.advances = 0
         self.commands = 0
 
-class Offline():
+class BinomialCKP():
     '''
     scheduler class to get action to take
     self.check : number of checkpoints currently assigned
@@ -137,7 +155,7 @@ class Offline():
 
     '''    
     def __init__(self, sn, st, f=None):
-        
+
         self.snaps = sn
         self.checkpoint = Checkpoint(sn)    
         self.steps = st
@@ -148,17 +166,22 @@ class Offline():
         self.oldcapo = 0
         self.checkup = 100
         self.repsup = 1000
-
         self.info = 3
         self.oldsnaps = sn
+        self.t = num_steps(self.snaps, self.steps)
+
 
     def revolve(self):
         """
         revolve scheduler to get action to execute at a given point
         """
         self.checkpoint.commands += 1
+        
 
         if self.check < -1 or self.capo > self.fine:
+            print('capo > fine')
+            print(self.capo)
+            print(self.fine)
             return ActionType.error
 
         if self.check == -1 and self.capo < self.fine:
@@ -200,12 +223,14 @@ class Offline():
                 self.oldsnaps = self.snaps
                 if self.snaps > self.checkup:
                     self.info = 14
+                    print(14)
                     return ActionType.error
 
                 if self.info > 0:
                     num = numforw(self.fine - self.capo, self.snaps)
                     if num == -1:
                         self.info = 12
+                        print(12)
                         return ActionType.error
                     print(f" prediction of needed forward steps: {num:8}")
                     print(f" slowdown factor: {num / (self.fine - self.capo):.4f}\n")
@@ -220,6 +245,7 @@ class Offline():
                 self.check += 1 #aggiungi un checkpoint
                 if self.check >= self.checkup or self.check + 1 > self.snaps:
                     self.info = 10 if self.check >= self.checkup else 11
+                    print(10)
                     return ActionType.error
 
                 self.checkpoint.ch[self.check] = self.capo
@@ -229,12 +255,15 @@ class Offline():
                 return ActionType.takeshot
 
             else:  # Advance
+                
                 if self.oldfine < self.fine and self.snaps == self.check + 1:
                     self.info = 13
+                    print(13)
                     return ActionType.error
 
                 self.oldcapo = self.capo #add checkpoints to the list
-                ds = self.snaps - self.check #numero di checkpoint che posso ancora aggiungere
+                ds = self.snaps - self.check #numero di checkpoint che posso ancora aggiungere                
+
                 if ds < 1:
                     self.info = 11
                     return ActionType.error
@@ -244,6 +273,8 @@ class Offline():
                 while range_ < self.fine - self.capo:
                     reps += 1
                     range_ = range_ * (reps + ds) // reps
+                
+                #range is equal to beta(ds,reps) where beta is binomial coefficient (ds+reps, reps)
 
                 if reps > self.repsup:
                     self.info = 15
@@ -253,12 +284,13 @@ class Offline():
                     self.info = 14
                     return ActionType.error
 
-                bino1 = range_ * reps // (ds + reps)
-                bino2 = (bino1 * ds) // (ds + reps - 1) if ds > 1 else 1
-                bino3 = bino2 * (ds - 1) // (ds + reps - 2) if ds > 2 else (0 if ds == 1 else 1)
-                bino4 = bino2 * (reps - 1) // ds
-                bino5 = bino3 * (ds - 2) // reps if ds > 3 else (0 if ds < 3 else 1)
+                bino1 = range_ * reps // (ds + reps) # bino1 = beta(ds, reps-1)
+                bino2 = (bino1 * ds) // (ds + reps - 1) if ds > 1 else 1 #bino2 = beta(ds-1, reps-1)
+                bino3 = bino2 * (ds - 1) // (ds + reps - 2) if ds > 2 else (0 if ds == 1 else 1) # bino3 = beta(ds-2, reps-1)
+                bino4 = bino2 * (reps - 1) // ds #bino4 = beta(ds, reps-2)
+                bino5 = bino3 * (ds - 2) // reps if ds > 3 else (0 if ds < 3 else 1) #bino5 = beta(ds-3, reps)
 
+                #update capo following rule at the end of page 34 of revolve paper by Griewank and Walther
                 if self.fine - self.capo <= bino1 + bino3:
                     self.capo += bino4
                 elif self.fine - self.capo >= range_ - bino5:
