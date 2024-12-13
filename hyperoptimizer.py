@@ -228,7 +228,9 @@ def multi_RMD(w, v, parser, loss, f, gammas, alphas, T, batches):
         for j, (ixs, _) in enumerate(parser.shape_idx.values()):
                 d_gamma[i,j] = np.dot(d_v[ixs], V.val[ixs] + g[ixs])
         #d_gamma[i] = np.dot(d_v,V.val+g)
+        print('get d_w')
         d_w -= (1-cur_gamma)*hyper_gradient(W.val, batch, d_v)
+        print('done')
         d_v *= cur_gamma
 
         print('end backprop')
@@ -409,3 +411,5 @@ def data_RMD(w, v, L2, loss, f , gammas, alphas, T, batches, meta):
             'hM_v': dM_v,
             'hL_data': dL_data,
             'hM_data': dM_data }
+
+

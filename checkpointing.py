@@ -1,8 +1,8 @@
+#import autograd.numpy as np #use this if hyper_grad_lr is defined here
 import numpy as np
-from abc import ABCMeta
 from enum import IntEnum
-import sys
-from math import comb
+from abc import ABCMeta
+
 
 """
 In the following I try to implement Hyper Grad without using the exact representation but
@@ -16,22 +16,6 @@ next checkpoint will be set
 """
 checkup = 10
 repsup = 64
-
-def beta(s : int, t : int):
-     ''' 
-     function that given s and t return the maximal number of steps that can be reversed with 
-     s checkpoints and a maximum of t forward steps from any of the states
-     '''
-     return comb(s + t, s)
-
-def num_steps(s, b):
-    t = 0
-    while True:
-        print(t)
-        if beta(s,t) >= b:
-            return t
-        t += 1
-
 
 
 def numforw(steps, snaps):
@@ -62,8 +46,7 @@ def numforw(steps, snaps):
 
 def maxrange(ss, tt):
     
-    MAXINT = sys.maxsize  # massimo valore per un intero (`2**63 - 1` su sistemi a 64-bit)
-
+    
     if tt < 0 or ss < 0:
         print("Error in MAXRANGE: negative parameter")
         return -1
@@ -73,12 +56,8 @@ def maxrange(ss, tt):
     for i in range(1, tt + 1):  # `range(1, tt+1)` include `tt`
         res *= (ss + i)
         res /= i
-
-        if res > MAXINT:
-            ires = MAXINT
-            print(f"Warning from MAXRANGE: returned maximal integer {ires}")
-            return ires
-
+ 
+    #ires = beta(ss, tt)
     ires = int(res) 
     return ires
 
@@ -91,6 +70,8 @@ def adjust(n_iter):
     s = 0
 
     # Primo ciclo: ridurre `s` finché maxrange supera `n_iter`
+    #while beta(snaps + s, reps + s)>n_iter
+    #questo while controlla se beta(1,1) > n_iter, beta(1,1) = 2.
     while maxrange(snaps + s, reps + s) > n_iter:
         s -= 1
 
@@ -101,10 +82,13 @@ def adjust(n_iter):
     # Aggiorna snaps e reps
     snaps += s
     reps += s
+    #in questo momento snaps = reps = s+1
     s = -1
-
+    
     # Riduci snaps o reps finché maxrange è maggiore o uguale a `n_iter`
     while maxrange(snaps, reps) >= n_iter:
+        #qua si riducono in maniera alternata snaps e reps, perché si parte con snaps = reps e 
+        #poi snaps= reps +1 e poi di nuovo snaps = reps
         if snaps > reps:
             snaps -= 1
             s = 0
@@ -154,10 +138,10 @@ class BinomialCKP():
     self.snaps : number of checkpoints you want to use with limit self.checkup
 
     '''    
-    def __init__(self, sn, st, f=None):
+    def __init__(self, st, f=None):
 
-        self.snaps = sn
-        self.checkpoint = Checkpoint(sn)    
+        self.snaps = adjust(st)
+        self.checkpoint = Checkpoint(self.snaps)    
         self.steps = st
         self.check = -1
         self.info = 3
@@ -167,9 +151,7 @@ class BinomialCKP():
         self.checkup = 100
         self.repsup = 1000
         self.info = 3
-        self.oldsnaps = sn
-        self.t = num_steps(self.snaps, self.steps)
-
+        self.oldsnaps = self.snaps
 
     def revolve(self):
         """
@@ -304,3 +286,94 @@ class BinomialCKP():
                 self.checkpoint.advances += self.capo - self.oldcapo
                 self.oldfine = self.fine
                 return ActionType.advance
+
+from hyperoptimizer import load_alpha
+from autograd import grad
+
+
+
+def hyper_grad_lr(nSteps, parser, loss, f, multi_alpha, multi_gamma, w_0, v_0, batch_idxs, num_epochs ):
+
+    scheduler = BinomialCKP(nSteps)
+    stack = [{} for _ in range(scheduler.snaps)]
+    iters = list(zip(range(nSteps), multi_alpha, multi_gamma, batch_idxs * num_epochs))
+    gradient = grad(loss)
+    l_grad   = grad(f)
+    w, v = w_0, v_0
+
+
+    def forward(check:int, nfrom: int, nto: int):
+
+        w = stack[check]['weights']
+        v = stack[check]['velocity']
+
+        for t, alpha, gamma, batch in iters[nfrom:nto]:
+            print(f'forward step number {t}')
+            cur_alpha = load_alpha(parser, alpha)
+            cur_gamma = load_alpha(parser, gamma)
+            g =  gradient(w, batch)
+            v *= cur_gamma
+            v -= (1 - cur_gamma)*g
+            w += cur_alpha*v
+
+        return w, v
+
+    def reverse(iteration, w, v, d_w, d_v, d_alpha, d_gamma):
+        '''
+        This function does only one step of RMD
+        '''
+        hyper_gradient = grad(lambda w, idx, d: np.dot(gradient(w,idx),d))
+        i, alpha, gamma, batch = iters[iteration]
+        print(f'backprop step {i}')
+        cur_alpha = load_alpha(parser, alpha)
+        cur_gamma = load_alpha(parser, gamma)
+        for j, (ixs, _) in enumerate(parser.shape_idx.values()):
+                d_alpha[i,j] = np.dot(d_w[ixs], v[ixs])
+
+        #gradient descent reversion
+        g  = gradient(w, batch)
+        w -= cur_alpha * v
+        v += (1-cur_gamma)*g
+        v /= cur_gamma
+
+        d_v += cur_alpha*d_w
+        for j, (ixs, _) in enumerate(parser.shape_idx.values()):
+                d_gamma[i,j] = np.dot(d_v[ixs], v[ixs] + g[ixs])
+        print('get dw')
+        d_w -= (1-cur_gamma)*hyper_gradient(w, batch, d_v)
+        print('done')
+        d_v *= cur_gamma
+
+        return d_w, d_v, d_alpha, d_gamma
+
+    
+    while(True):
+        action = scheduler.revolve()
+        print(action)
+        if action == ActionType.advance:
+            print(f'advance the system from {scheduler.oldcapo} to {scheduler.capo}')
+            w, v = forward(scheduler.check, scheduler.oldcapo, scheduler.capo)
+        elif action == ActionType.takeshot:
+            print('saving current state')
+            print(scheduler.check)
+            stack[scheduler.check]['weights']  = w
+            stack[scheduler.check]['velocity'] = v
+        elif action == ActionType.firsturn:
+            print('executing first reverse step')
+            wF, vF = forward(scheduler.check, scheduler.oldcapo, nSteps)
+            #initialise gradient values
+            d_alpha, d_gamma = np.zeros(multi_alpha.shape), np.zeros(multi_gamma.shape)
+            d_v = np.zeros_like(w_0)
+            d_w = l_grad(wF, batch_idxs.all_idxs)  
+            #first step
+            d_w, d_v, d_alpha, d_gamma = reverse(nSteps-1, wF, vF, d_w, d_v, d_alpha, d_gamma)
+        elif action == ActionType.restore:
+            print(f'loading state number {scheduler.check}')
+            w, v = stack[scheduler.check]['weights'], stack[scheduler.check]['velocity']
+        elif action == ActionType.youturn:
+            print(f' doing reverse step at time {scheduler.fine}')
+            d_w, d_v, d_alpha, d_gamma = reverse(scheduler.fine, w, v, d_w, d_v, d_alpha, d_gamma)
+        if action == ActionType.terminate:
+            break
+
+    return d_w, d_v, d_alpha, d_gamma
