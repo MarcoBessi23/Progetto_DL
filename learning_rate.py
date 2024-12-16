@@ -91,63 +91,63 @@ plt.ylabel('learning rate')
 plt.show()
 plt.close()
 
-plt.plot(iteration, grad_vec[:,0], color= 'red', marker = 'o')
-plt.plot(iteration, grad_vec[:,2], color= 'yellow', marker = 'o')
-plt.plot(iteration, grad_vec[:,4], color= 'blue', marker = 'o')
-plt.plot(iteration, grad_vec[:,6], color= 'green', marker = 'o')
-plt.xlabel('iteration')
-plt.ylabel('hypergradient')
-plt.show()
-
-plt.plot(meta_iteration, weights_1, color= 'red', marker = 'o')
-plt.plot(meta_iteration, weights_2, color= 'yellow', marker = 'o')
-plt.plot(meta_iteration, weights_3, color= 'blue', marker = 'o')
-plt.plot(meta_iteration, weights_4, color= 'green', marker = 'o')
-plt.xlabel('meta iteration')
-plt.ylabel('weights scale')
-plt.show()
-
-plt.close()
-
-plt.plot(meta_iteration, bias_1, color= 'red', marker = 'o')
-plt.plot(meta_iteration, bias_2, color= 'yellow', marker = 'o')
-plt.plot(meta_iteration, bias_3, color= 'blue', marker = 'o')
-plt.plot(meta_iteration, bias_4, color= 'green', marker = 'o')
-plt.xlabel('meta iteration')
-plt.ylabel('bias scale')
-
-plt.show()
-
-start = time()
-for i in range(meta_iter):
-    print(f'meta iter number {i}')
-    res = RMD(W0, V0, indexed_loss_fun, indexed_loss_fun, gammas, log_alphas, N_iter, batch_idxs)
-    hyper_g = res['hg_alpha']
-    log_alphas = log_alphas - meta_lr * hyper_g
-    meta_lc.append(res['loss'])
-    if i == 0:
-        initial_lc = res['learning curve']
-    if i == meta_iter-1:
-        final_lc = res['learning curve']
-end = time()-start
-print(f'time of HPO: {end}')
-
-folder_path = '/home/marco/Documenti/Progetto_DL/results_learning_rate'
-
-plt.plot(meta_iteration, meta_lc, marker='o')
-plt.xlabel('meta iteration')
-plt.ylabel('final loss')
-
-meta_train = os.path.join(folder_path, "meta_training_loss.png")
-plt.savefig(meta_train, dpi=300)
-plt.close()
-
-plt.plot(iteration, initial_lc, marker = 'o', color = 'blue')
-plt.plot(iteration, final_lc, marker = 'o', color = 'red')
-plt.xlabel('iteration')
-plt.ylabel('elementary learning curve')
-plt.title('initial vs final training loss')
-
-initial_vs_final = os.path.join(folder_path, "initialVSfinal_loss.png")
-plt.savefig(initial_vs_final)
-plt.close()
+#plt.plot(iteration, grad_vec[:,0], color= 'red', marker = 'o')
+#plt.plot(iteration, grad_vec[:,2], color= 'yellow', marker = 'o')
+#plt.plot(iteration, grad_vec[:,4], color= 'blue', marker = 'o')
+#plt.plot(iteration, grad_vec[:,6], color= 'green', marker = 'o')
+#plt.xlabel('iteration')
+#plt.ylabel('hypergradient')
+#plt.show()
+#
+#plt.plot(meta_iteration, weights_1, color= 'red', marker = 'o')
+#plt.plot(meta_iteration, weights_2, color= 'yellow', marker = 'o')
+#plt.plot(meta_iteration, weights_3, color= 'blue', marker = 'o')
+#plt.plot(meta_iteration, weights_4, color= 'green', marker = 'o')
+#plt.xlabel('meta iteration')
+#plt.ylabel('weights scale')
+#plt.show()
+#
+#plt.close()
+#
+#plt.plot(meta_iteration, bias_1, color= 'red', marker = 'o')
+#plt.plot(meta_iteration, bias_2, color= 'yellow', marker = 'o')
+#plt.plot(meta_iteration, bias_3, color= 'blue', marker = 'o')
+#plt.plot(meta_iteration, bias_4, color= 'green', marker = 'o')
+#plt.xlabel('meta iteration')
+#plt.ylabel('bias scale')
+#
+#plt.show()
+#
+#start = time()
+#for i in range(meta_iter):
+#    print(f'meta iter number {i}')
+#    res = RMD(W0, V0, indexed_loss_fun, indexed_loss_fun, gammas, log_alphas, N_iter, batch_idxs)
+#    hyper_g = res['hg_alpha']
+#    log_alphas = log_alphas - meta_lr * hyper_g
+#    meta_lc.append(res['loss'])
+#    if i == 0:
+#        initial_lc = res['learning curve']
+#    if i == meta_iter-1:
+#        final_lc = res['learning curve']
+#end = time()-start
+#print(f'time of HPO: {end}')
+#
+#folder_path = '/home/marco/Documenti/Progetto_DL/results_learning_rate'
+#
+#plt.plot(meta_iteration, meta_lc, marker='o')
+#plt.xlabel('meta iteration')
+#plt.ylabel('final loss')
+#
+#meta_train = os.path.join(folder_path, "meta_training_loss.png")
+#plt.savefig(meta_train, dpi=300)
+#plt.close()
+#
+#plt.plot(iteration, initial_lc, marker = 'o', color = 'blue')
+#plt.plot(iteration, final_lc, marker = 'o', color = 'red')
+#plt.xlabel('iteration')
+#plt.ylabel('elementary learning curve')
+#plt.title('initial vs final training loss')
+#
+#initial_vs_final = os.path.join(folder_path, "initialVSfinal_loss.png")
+#plt.savefig(initial_vs_final)
+#plt.close()

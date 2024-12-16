@@ -6,9 +6,20 @@ import autograd.numpy as np
 from autograd import grad
 from autograd.misc.flatten import flatten
 from autograd.misc.optimizers import adam, sgd
-from autograd.scipy.special import logsumexp
+#from autograd.scipy.special import logsumexp
 import numpy.random as npr
+import hashlib
 
+class RandomState(npr.RandomState):
+    """Takes an arbitrary object as seed (uses its string representation)"""
+    def __init__(self, obj):
+        hashed_int = int(hashlib.md5(str(obj).encode()).hexdigest()[:8], base=16)
+        super(RandomState, self).__init__(hashed_int)
+
+
+def logsumexp(X, axis):
+    max_X = np.max(X)
+    return max_X + np.log(np.sum(np.exp(X - max_X), axis=axis, keepdims=True))
 
 class Weight_Parser():
     def __init__(self) :
@@ -53,6 +64,47 @@ def construct_nn(layer_sizes:list):
     return parser, nn, loss
 
 
+def construct_nn_multi(layer_sizes:list):
+    
+    parser = Weight_Parser()
+    layers = zip(layer_sizes[:-1],layer_sizes[1:])
+    m = len(layer_sizes)-1
+
+    for i,l in enumerate(layers):
+            parser.add(('mat',i),l)
+            parser.add(('bias',i),l[1])
+
+    def nn(w:np.ndarray, inputs:np.ndarray) -> float:
+        
+        for i in range(m):
+            #print('input')
+            #print(inputs)
+            weight_matrix = parser.get(('mat',i),w)
+            b = parser.get(('bias',i),w)
+            outputs = np.dot(inputs,weight_matrix) + b
+            inputs = np.tanh(outputs)
+            #print('weights')
+            #print(weight_matrix)
+            #print('bias')
+            #print(b)
+            #print(f'outputs iter {i}:')
+            #print(outputs)
+
+        return inputs - logsumexp(inputs, axis=1) #, keepdims=True)
+    
+    def loss(w:np.ndarray, inputs:np.ndarray, targets:np.ndarray, L2_reg:float = 0 ):
+        log_lik = np.sum(nn(w, inputs) * targets)/inputs.shape[0]
+        #print('valore log lik')
+        #print(log_lik)
+        prior = np.dot(w * L2_reg,w)
+        #print('valore prior')
+        #print(prior)
+        return -log_lik + prior
+
+
+    return parser, nn, loss
+
+
 def construct_nn_reg(layer_sizes:list):
     '''
     function to build neural network for L2 regularization
@@ -72,6 +124,14 @@ def construct_nn_reg(layer_sizes:list):
             b = parser.get(('bias', i), w)
             b = 0.0
             outputs = np.dot(inputs,weight_matrix) + b
+            print('input')
+            print(inputs)
+            print('weights')
+            print(weight_matrix)
+            print('bias')
+            print(b)
+            print(f'outputs iter {i}:')
+            print(outputs)
             # Apply tanh activation to hidden layers only
             if i < m - 1:
                 inputs = np.tanh(outputs)
@@ -84,7 +144,11 @@ def construct_nn_reg(layer_sizes:list):
     
     def loss(w:np.ndarray, L2_reg: np.ndarray, inputs:np.ndarray, targets:np.ndarray):
         log_lik = np.sum(nn(w, inputs) * targets)/inputs.shape[0]
+        print('valore log lik')
+        print(log_lik)
         prior = np.dot(L2_reg * w, w)
+        print('valore prior')
+        print(prior)
         return -log_lik + prior #negative log likelihood + regularization prior
 
 

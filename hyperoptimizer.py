@@ -172,8 +172,8 @@ def RMD(w, v, loss, f, gammas, alphas, T, batches):
 def load_alpha(parser, alpha):
     index_shape_vec = parser.shape_idx
     cur_alpha = np.zeros(parser.N)
-    for i, (val1, _) in enumerate(index_shape_vec.values()):
-        cur_alpha[val1] = alpha[i]
+    for i, (val, _) in enumerate(index_shape_vec.values()):
+        cur_alpha[val] = alpha[i]
     return cur_alpha
 
 
@@ -205,7 +205,7 @@ def multi_RMD(w, v, parser, loss, f, gammas, alphas, T, batches):
     l_grad = grad(f)
 
     d_w = l_grad(W.val,batches.all_idxs)
-    hyper_gradient = grad(lambda w, idx, d: np.dot(gradient(w,idx),d))
+    hessianvp = grad(lambda w, idx, d: np.dot(gradient(w,idx),d))
 
     d_alpha, d_gamma = np.zeros(alphas.shape), np.zeros(gammas.shape)
     d_v = np.zeros_like(w)
@@ -228,9 +228,7 @@ def multi_RMD(w, v, parser, loss, f, gammas, alphas, T, batches):
         for j, (ixs, _) in enumerate(parser.shape_idx.values()):
                 d_gamma[i,j] = np.dot(d_v[ixs], V.val[ixs] + g[ixs])
         #d_gamma[i] = np.dot(d_v,V.val+g)
-        print('get d_w')
-        d_w -= (1-cur_gamma)*hyper_gradient(W.val, batch, d_v)
-        print('done')
+        d_w -= (1-cur_gamma)*hessianvp(W.val, batch, d_v)
         d_v *= cur_gamma
 
         print('end backprop')
@@ -413,3 +411,20 @@ def data_RMD(w, v, L2, loss, f , gammas, alphas, T, batches, meta):
             'hM_data': dM_data }
 
 
+
+
+def adam(grad, x, num_iters=100,
+         step_size=0.1, b1 = 0.1, b2 = 0.01, eps = 10**-4, lam=10**-4):
+    """Adam as described in http://arxiv.org/pdf/1412.6980.pdf.
+    It's basically RMSprop with momentum and some correction terms."""
+    m = np.zeros(len(x))
+    v = np.zeros(len(x))
+    for i in range(num_iters):
+        b1t = 1 - (1-b1)*(lam**i)
+        g = grad(x, i)
+        m = b1t*g     + (1-b1t)*m   # First  moment estimate
+        v = b2*(g**2) + (1-b2)*v    # Second moment estimate
+        mhat = m/(1-(1-b1)**(i+1))  # Bias correction
+        vhat = v/(1-(1-b2)**(i+1))
+        x -= step_size*mhat/(np.sqrt(vhat) + eps)
+    return x
