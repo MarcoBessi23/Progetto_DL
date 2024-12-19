@@ -11,60 +11,64 @@ from time import time
 
 # Model parameters
 layer_sizes = [784, 50, 50, 50, 10]
-L2_reg = 0
-
 # Training parameters
 
-batch_size = 250
+batch_size = 200
 num_epochs = 20
-meta_lr = 40 #0.001
-meta_mass = 0.9
-N_data = 1000
-meta_iter = 4
-log_param_scale = -2.0
-velocity_scale = 0.0
-#layer_specs = [tanh_layer(i,o) for i,o in zip(layer_sizes[:-1],layer_sizes[1:])] #[tanh_layer(784,50),tanh_layer(50,50),tanh_layer(50,10)]
+meta_lr    = 0.04
+N_data     = 10000
+meta_iter  = 4
 
 N, train_images, train_labels, test_images, test_labels = load_mnist()
 train_images = train_images[:N_data, :]
 train_labels = train_labels[:N_data, :]
-batch_idxs = BatchList(N_data, batch_size)
+batch_idxs   = BatchList(N_data, batch_size)
 
 #construct neural network
 
-parser, MLP, loss = construct_nn(layer_sizes)
-#parser, nn, loss = make_nn_funs(layer_specs, L2_reg)
-npr.seed(1)
-o = parser.shape_idx
-print(len(o)) # number of hyper
-init_log_alphas = 1.0
-
-num_parameters = parser.N
-W0 = np.random.randn(num_parameters) * np.exp(log_param_scale)
-V0 = np.zeros_like(W0)
-log_alpha_0 = 1.0
-gamma_0 = 0.9
 N_iter = 100
-log_alphas = np.full(N_iter, log_alpha_0)
-gammas = np.full(N_iter, gamma_0)
-multi_alpha = np.full((N_iter, len(o)), init_log_alphas)
-multi_gamma = np.full((N_iter, len(o)), gamma_0)
+parser, MLP, loss = construct_nn_multi(layer_sizes)
+o = parser.shape_idx
+
+def logit(x): 
+    return 1 / (1 + np.exp(-x))
+
+def inv_logit(y): 
+    return -np.log( 1/y - 1)
+
+def d_logit(x): 
+    return logit(x) * (1 - logit(x))
+
+init_log_L2_reg = -100.0
+init_log_alphas = -1.0
+init_invlogit_gammas = inv_logit(0.5)
+init_log_param_scale = -3.0
+num_parameters  = parser.N
+seed            = 1
+log_param_scale = np.full(len(o), init_log_param_scale)
+log_L2_reg      = np.full(num_parameters, init_log_L2_reg)
+multi_alpha     = np.full((N_iter, len(o)), init_log_alphas)
+multi_gamma     = np.full((N_iter, len(o)), -init_invlogit_gammas)
+num_epochs      = int(N_iter/len(batch_idxs))+1
+
 
 def indexed_loss_fun(w, idxs):
-    return loss(w, inputs = train_images[idxs], targets = train_labels[idxs], L2_reg = L2_reg)
+    return loss(w, inputs = train_images[idxs], targets = train_labels[idxs], L2_reg = np.exp(log_L2_reg))
 
-iteration = [i for i in range(N_iter)]
+iteration      = [i for i in range(N_iter)]
 meta_iteration = [i for i in range(meta_iter)]
-meta_lc = []
+meta_lc   = []
 weights_1 = []
 weights_2 = []
 weights_3 = []
 weights_4 = []
-bias_1 = []
-bias_2 = []
-bias_3 = []
-bias_4 = []
+bias_1    = []
+bias_2    = []
+bias_3    = []
+bias_4    = []
 
+meta_iter = 1
+print(multi_gamma)
 for i in range(meta_iter):
     print(f'meta iter {i}')
     weights_1.append(multi_alpha[0,0])
@@ -75,21 +79,30 @@ for i in range(meta_iter):
     bias_3.append(multi_alpha[0,5])
     weights_4.append(multi_alpha[0,6])
     bias_4.append(multi_alpha[0,7])
-    res = multi_RMD(W0, V0, parser, indexed_loss_fun, indexed_loss_fun, multi_gamma, multi_alpha, N_iter, batch_idxs)
-    hyper_lr = res['hg_alpha']
-    hyper_momentum = res['hg_gamma']
-    multi_gamma = multi_gamma + meta_mass * hyper_momentum
-    multi_alpha = multi_alpha + meta_lr * hyper_lr
 
-    if i == meta_iter-1:
-        grad_vec = hyper_lr
+    W0  = np.exp(load_alpha(parser, log_param_scale))
+    rs  = RandomState((seed, meta_iter))
+    W0 *= rs.randn(W0.size)
+    V0  = np.zeros_like(W0)
+    res = multi_RMD(W0, V0, parser, indexed_loss_fun, indexed_loss_fun, logit(multi_gamma), np.exp(multi_alpha), 
+                    N_iter, batch_idxs, True)
+    print(res)
+    #hyper_lr       = res['hg_alpha']
+    #hyper_momentum = res['hg_gamma']
+    #multi_gamma    = multi_gamma + meta_lr * hyper_momentum
+    #multi_alpha    = multi_alpha + meta_lr * hyper_lr
+#
+    #if i == meta_iter-1:
+    #    grad_vec = hyper_lr
 
-for i in range(len(layer_sizes)-1):
-    plt.plot(iteration,multi_alpha[:, 2*i], marker = 'o')
-plt.xlabel('iteration')
-plt.ylabel('learning rate')
-plt.show()
-plt.close()
+#print(res['loss'])
+
+#for i in range(len(layer_sizes)-1):
+#    plt.plot(iteration,multi_alpha[:, 2*i], marker = 'o')
+#plt.xlabel('iteration')
+#plt.ylabel('learning rate')
+#plt.show()
+#plt.close()
 
 #plt.plot(iteration, grad_vec[:,0], color= 'red', marker = 'o')
 #plt.plot(iteration, grad_vec[:,2], color= 'yellow', marker = 'o')

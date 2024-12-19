@@ -177,7 +177,7 @@ def load_alpha(parser, alpha):
     return cur_alpha
 
 
-def multi_RMD(w, v, parser, loss, f, gammas, alphas, T, batches):
+def multi_RMD(w, v, parser, loss, f, gammas, alphas, T, batches, only_forw):
     '''
     Version of RMD in which learning rate has shape like neural network parameters
     '''
@@ -202,6 +202,9 @@ def multi_RMD(w, v, parser, loss, f, gammas, alphas, T, batches):
     final_loss = loss(W.val, batches.all_idxs)
     final_param = W.val
 
+    if only_forw:
+        return final_loss
+    
     l_grad = grad(f)
 
     d_w = l_grad(W.val,batches.all_idxs)

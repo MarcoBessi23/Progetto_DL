@@ -145,7 +145,7 @@ class BinomialCKP():
         self.steps = st
         self.check = -1
         self.info = 3
-        self.fine = self.steps
+        self.fine = st
         self.capo = 0
         self.oldcapo = 0
         self.checkup = 100
@@ -287,93 +287,3 @@ class BinomialCKP():
                 self.oldfine = self.fine
                 return ActionType.advance
 
-from hyperoptimizer import load_alpha
-from autograd import grad
-
-
-
-def hyper_grad_lr(nSteps, parser, loss, f, multi_alpha, multi_gamma, w_0, v_0, batch_idxs, num_epochs ):
-
-    scheduler = BinomialCKP(nSteps)
-    stack = [{} for _ in range(scheduler.snaps)]
-    iters = list(zip(range(nSteps), multi_alpha, multi_gamma, batch_idxs * num_epochs))
-    gradient = grad(loss)
-    l_grad   = grad(f)
-    w, v = w_0, v_0
-
-
-    def forward(check:int, nfrom: int, nto: int):
-
-        w = stack[check]['weights']
-        v = stack[check]['velocity']
-
-        for t, alpha, gamma, batch in iters[nfrom:nto]:
-            print(f'forward step number {t}')
-            cur_alpha = load_alpha(parser, alpha)
-            cur_gamma = load_alpha(parser, gamma)
-            g =  gradient(w, batch)
-            v *= cur_gamma
-            v -= (1 - cur_gamma)*g
-            w += cur_alpha*v
-
-        return w, v
-
-    def reverse(iteration, w, v, d_w, d_v, d_alpha, d_gamma):
-        '''
-        This function does only one step of RMD
-        '''
-        hyper_gradient = grad(lambda w, idx, d: np.dot(gradient(w,idx),d))
-        i, alpha, gamma, batch = iters[iteration]
-        print(f'backprop step {i}')
-        cur_alpha = load_alpha(parser, alpha)
-        cur_gamma = load_alpha(parser, gamma)
-        for j, (ixs, _) in enumerate(parser.shape_idx.values()):
-                d_alpha[i,j] = np.dot(d_w[ixs], v[ixs])
-
-        #gradient descent reversion
-        g  = gradient(w, batch)
-        w -= cur_alpha * v
-        v += (1-cur_gamma)*g
-        v /= cur_gamma
-
-        d_v += cur_alpha*d_w
-        for j, (ixs, _) in enumerate(parser.shape_idx.values()):
-                d_gamma[i,j] = np.dot(d_v[ixs], v[ixs] + g[ixs])
-        print('get dw')
-        d_w -= (1-cur_gamma)*hyper_gradient(w, batch, d_v)
-        print('done')
-        d_v *= cur_gamma
-
-        return d_w, d_v, d_alpha, d_gamma
-
-    
-    while(True):
-        action = scheduler.revolve()
-        print(action)
-        if action == ActionType.advance:
-            print(f'advance the system from {scheduler.oldcapo} to {scheduler.capo}')
-            w, v = forward(scheduler.check, scheduler.oldcapo, scheduler.capo)
-        elif action == ActionType.takeshot:
-            print('saving current state')
-            print(scheduler.check)
-            stack[scheduler.check]['weights']  = w
-            stack[scheduler.check]['velocity'] = v
-        elif action == ActionType.firsturn:
-            print('executing first reverse step')
-            wF, vF = forward(scheduler.check, scheduler.oldcapo, nSteps)
-            #initialise gradient values
-            d_alpha, d_gamma = np.zeros(multi_alpha.shape), np.zeros(multi_gamma.shape)
-            d_v = np.zeros_like(w_0)
-            d_w = l_grad(wF, batch_idxs.all_idxs)  
-            #first step
-            d_w, d_v, d_alpha, d_gamma = reverse(nSteps-1, wF, vF, d_w, d_v, d_alpha, d_gamma)
-        elif action == ActionType.restore:
-            print(f'loading state number {scheduler.check}')
-            w, v = stack[scheduler.check]['weights'], stack[scheduler.check]['velocity']
-        elif action == ActionType.youturn:
-            print(f' doing reverse step at time {scheduler.fine}')
-            d_w, d_v, d_alpha, d_gamma = reverse(scheduler.fine, w, v, d_w, d_v, d_alpha, d_gamma)
-        if action == ActionType.terminate:
-            break
-
-    return d_w, d_v, d_alpha, d_gamma

@@ -1,6 +1,5 @@
 """A multi-layer perceptron for classification of MNIST handwritten digits."""
 #import numpy as np
-from dataloader import load_mnist
 import autograd.numpy as np 
 #import autograd.numpy.random as npr
 from autograd import grad
@@ -9,6 +8,8 @@ from autograd.misc.optimizers import adam, sgd
 #from autograd.scipy.special import logsumexp
 import numpy.random as npr
 import hashlib
+from collections import OrderedDict
+
 
 class RandomState(npr.RandomState):
     """Takes an arbitrary object as seed (uses its string representation)"""
@@ -35,33 +36,84 @@ class Weight_Parser():
         idxs, shape = self.shape_idx[name]
         return np.reshape(param[idxs], shape)
 
-def construct_nn(layer_sizes:list):
-    
-    parser = Weight_Parser()
-    layers = zip(layer_sizes[:-1],layer_sizes[1:])
-    m = len(layer_sizes)-1
+class VectorParser(object):
+    def __init__(self):
+        self.idxs_and_shapes = OrderedDict()
+        self.vect = np.zeros((0,))
 
-    for i,l in enumerate(layers):
-            parser.add(('mat',i),l)
-            parser.add(('bias',i),l[1])
+    def add_shape(self, name, shape):
+        start = len(self.vect)
+        size = np.prod(shape)
+        self.idxs_and_shapes[name] = (slice(start, start + size), shape)
+        self.vect = np.concatenate((self.vect, np.zeros(size)), axis=0)
 
-    def nn(w:np.ndarray, inputs:np.ndarray) -> float:
-        
-        for i in range(m):
-            weight_matrix = parser.get(('mat',i),w)
-            b = parser.get(('bias',i),w)
-            outputs = np.dot(inputs,weight_matrix) + b
-            inputs = np.tanh(outputs)
+    def new_vect(self, vect):
+        assert vect.size == self.vect.size
+        new_parser = self.empty_copy()
+        new_parser.vect = vect
+        return new_parser
 
-        return inputs - logsumexp(inputs, axis=1, keepdims=True)
-    
-    def loss(w:np.ndarray, inputs:np.ndarray, targets:np.ndarray, L2_reg:float = 0 ):
-        log_lik = np.sum(nn(w, inputs) * targets)/inputs.shape[0]
-        prior = L2_reg*np.dot(w,w)
-        return -log_lik + prior
+    def empty_copy(self):
+        """Creates a parser with a blank vector."""
+        new_parser = VectorParser()
+        new_parser.idxs_and_shapes = self.idxs_and_shapes.copy()
+        new_parser.vect = None
+        return new_parser
 
+    def as_dict(self):
+        return {k : self[k] for k in self.names}
 
-    return parser, nn, loss
+    @property
+    def names(self):
+        return self.idxs_and_shapes.keys()
+
+    def __getitem__(self, name):
+        idxs, shape = self.idxs_and_shapes[name]
+        return np.reshape(self.vect[idxs], shape)
+
+    def __setitem__(self, name, val):
+        if isinstance(val, list): val = np.array(val)
+        if name not in self.idxs_and_shapes:
+            self.add_shape(name, val.shape)
+
+        idxs, shape = self.idxs_and_shapes[name]
+        self.vect[idxs].reshape(shape)[:] = val
+
+def fill_parser(parser, items):
+    """Build a vector by assigning each block the corresponding value in
+       the items vector."""
+    partial_vects = [np.full(parser[name].size, items[i])
+                     for i, name in enumerate(parser.names)]
+    return np.concatenate(partial_vects, axis=0)
+
+def make_nn_funs(layer_sizes):
+    parser = VectorParser()
+    for i, shape in enumerate(zip(layer_sizes[:-1], layer_sizes[1:])):
+        parser.add_shape(('weights', i), shape)
+        parser.add_shape(('biases', i), (1, shape[1]))
+
+    def predictions(W_vect, X):
+        """Outputs normalized log-probabilities."""
+        W = parser.new_vect(W_vect)
+        cur_units = X
+        N_iter = len(layer_sizes) - 1
+        for i in range(N_iter):
+            cur_W = W[('weights', i)]
+            cur_B = W[('biases',  i)]
+            cur_units = np.dot(cur_units, cur_W) + cur_B
+            if i == (N_iter - 1):
+                cur_units = cur_units - logsumexp(cur_units, axis=1)
+            else:
+                cur_units = np.tanh(cur_units)
+        return cur_units
+
+    def loss(W_vect, X, T, L2_reg=0.0):
+        # TODO: consider treating L2_reg as a matrix
+        log_prior = -np.dot(W_vect * L2_reg, W_vect)
+        log_lik = np.sum(predictions(W_vect, X) * T) / X.shape[0]
+        return - log_prior - log_lik
+
+    return parser, predictions, loss
 
 
 def construct_nn_multi(layer_sizes:list):
