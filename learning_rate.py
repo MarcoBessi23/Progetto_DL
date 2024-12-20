@@ -74,10 +74,11 @@ def hyper_gradient(hyperparams_vec, i_hyper):
             idx_set.update(batch)
 
         return list(idx_set)
-
+    
     hyper_list = [W0, alphas, gammas]
     res = RMD_parsed(parser, hyper_list, indexed_loss_fun, training_set(i_hyper) )
-    hypergrads = hyperparams.copy()
+    hypergrads = hyperparams.empty_copy()
+    print(hypergrads.idxs_and_shapes)
     weights_grad = parser.new_vect(W0 * res[0])
     hypergrads['log_param_scale'] = [np.sum(weights_grad[name])
                                      for name in parser.names]

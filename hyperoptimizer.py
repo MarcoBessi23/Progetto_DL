@@ -4,93 +4,7 @@ from fractions import Fraction
 from collections import deque
 from time import time
 from neuralNet import VectorParser, fill_parser
-
-RADIX_SCALE = 2**52
-
-
-class BitStore(object):
-    """Efficiently stores information with non-integer number of bits (up to 16)."""
-    def __init__(self, length:int):
-        self.store = np.array([0] * length, dtype=object)
-
-    def push(self, N:int, M:int):
-        """Stores integer N, given that 0 <= N < M"""
-        assert np.all(M <= 2**16)
-        self.store *= M
-        self.store += N
-
-    def pop(self, M):
-        """Retrieves the last integer stored."""
-        N = self.store % M
-        self.store /= M
-        return N
-
-
-class ExactRep(object):
-    """Fixed-point representation of arrays with auxilliary bits such
-    that + - * / ops are all exactly invertible (except for
-    overflow)."""
-    def __init__(self, val, from_intrep=False):
-        if from_intrep:
-            self.intrep = val
-        else:
-            self.intrep = self.float_to_intrep(val)
-
-        self.aux = BitStore(len(val))
-
-    def add(self, A):
-        """Reversible addition of vector or scalar A."""
-        self.intrep += self.float_to_intrep(A)
-
-    def sub(self, A):
-        self.add(-A)
-
-    def rational_mul(self, n:int, d:int):
-        self.aux.push(self.intrep % d, d) # Store remainder bits externally
-        self.intrep //= d                 # Divide by denominator
-        self.intrep *= n                  # Multiply by numerator
-        self.intrep += np.array(self.aux.pop(n), dtype=np.int64)
-        #self.intrep += self.aux.pop(n)    # Pack bits into the remainder
-
-    def mul(self, a):
-        n, d = self.float_to_rational(a)
-        self.rational_mul(n, d)
-        
-    def div(self, a):
-        n, d = self.float_to_rational(a)
-        self.rational_mul(d, n)
-
-    #def float_to_rational(self, a):
-    #    d = 2**16 // int(a + 1)  #// instead of / because d must have type int
-    #    n = int(a * d + 1)
-    #    return  n, d
-
-    def float_to_rational(self, a):
-        assert np.all(a > 0.0)
-        d = 2**16 // np.fix(a+1).astype(int) # Uglier than it used to be: np.int(a + 1)
-        n = np.fix(a * d + 1).astype(int)
-        return  n, d
-
-    #def float_to_rational(self, a):
-    #    assert np.all(a > 0.0)
-    #    frac = Fraction(a).limit_denominator(65536)
-    #    return frac.numerator, frac.denominator
-
-    def float_to_intrep(self, x):
-        val = x*RADIX_SCALE
-        #print(type(val))
-        if np.isnan(val).any() or np.isinf(val).any():
-            print("Valori non validi trovati in x_scaled")
-            print("Indice dei valori NaN:", np.where(np.isnan(val)))
-            print("Indice dei valori inf:", np.where(np.isinf(val)))
-            print("Valori problematici:", x[np.isnan(val) | np.isinf(val)])
-            raise ValueError("Valori non validi in x_scaled")
-        
-        return val.astype(np.int64)   #(x * RADIX_SCALE).astype(np.int64)
-
-    @property
-    def val(self):
-        return self.intrep.astype(np.float64) / RADIX_SCALE
+from ExactRep import BitStore, ExactRep
 
 class BatchList(list):
     def __init__(self, N_total, N_batch):
@@ -203,7 +117,7 @@ def RMD_parsed(parser, hyper_vect, loss, indices):
     #L_hvp_meta = grad(grad_proj, 1)  # Returns a size(meta) output.
 
     for i, alpha, gamma in iters[::-1]:
-
+        print(f'step{i}')
         cur_alpha_vect = fill_parser(parser, alpha)
         cur_gamma_vect  = fill_parser(parser, gamma)
         for j, (_, (ixs, _)) in enumerate(parser.idxs_and_shapes.items()):
@@ -221,10 +135,9 @@ def RMD_parsed(parser, hyper_vect, loss, indices):
 
         d_w    -= L_hvp_w(W.val, (1.0 - cur_gamma_vect)*d_v, i)
         d_v    *= cur_gamma_vect
-        boolean = (ExactRep(w0).val == W.val)
-        print(boolean[0:3350])
-        print(sum(boolean[0:3350]))
-        assert np.all(ExactRep(w0).val == W.val)
+    
+    
+    assert np.all(ExactRep(w0).val == W.val)
     return d_w, d_alphas, d_gammas, w_final
 
 def multi_RMD(w, v, parser, loss, f, gammas, alphas, T, batches, only_forw):
