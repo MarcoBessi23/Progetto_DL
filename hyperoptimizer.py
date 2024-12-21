@@ -115,7 +115,7 @@ def RMD_parsed(parser, hyper_vect, loss, f):
     d_alphas, d_gammas = np.zeros(alphas.shape), np.zeros(gammas.shape)
     d_v = np.zeros(d_w.shape)
     grad_proj = lambda w, d, i: np.dot(L_grad(w, i), d)
-    L_hvp_w   = grad(grad_proj, 0)  # Returns a size(x) output.
+    L_hvp_w   = grad(grad_proj, 0)    # Returns a size(w) output.
     #L_hvp_meta = grad(grad_proj, 1)  # Returns a size(meta) output.
 
     for i, alpha, gamma in iters[::-1]:
@@ -128,7 +128,7 @@ def RMD_parsed(parser, hyper_vect, loss, f):
         W.sub(cur_alpha_vect * V.val)                        # Reverse position update
         g = L_grad(W.val, i)                                 # Evaluate gradient
         V.add((1.0 - cur_gamma_vect) * g)
-        V.div(cur_gamma_vect)  # Reverse momentum update
+        V.div(cur_gamma_vect)                                # Reverse momentum update
 
         d_v += d_w * cur_alpha_vect
 

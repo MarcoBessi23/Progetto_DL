@@ -30,7 +30,7 @@ N_tests = 10000
 # ----- Initial values of learned hyper-parameters -----
 init_log_L2_reg = -100.0
 init_log_alphas = -1.0
-init_invlogit_betas = inv_logit(0.5)
+init_invlogit_gammas = inv_logit(0.5)
 init_log_param_scale = -3.0
 
 # ----- Superparameters -----
@@ -43,11 +43,8 @@ parser, pred_fun, loss_fun = make_nn_funs(layer_sizes)
 N_weight_types = len(parser.names)
 hyperparams = VectorParser()
 hyperparams['log_param_scale'] = np.full(N_weight_types, init_log_param_scale)
-print(np.shape(hyperparams['log_param_scale']))
 hyperparams['log_alphas']      = np.full((N_iters, N_weight_types), init_log_alphas)
-print(np.shape(hyperparams['log_alphas']))
-hyperparams['invlogit_gammas']  = np.full((N_iters, N_weight_types), init_invlogit_betas)
-print(np.shape(hyperparams['invlogit_gammas']))
+hyperparams['invlogit_gammas']  = np.full((N_iters, N_weight_types), init_invlogit_gammas)
 fixed_hyperparams = VectorParser()
 fixed_hyperparams['log_L2_reg'] = np.full(N_weight_types, init_log_L2_reg)
 hypergrads = VectorParser()
@@ -84,7 +81,6 @@ def hyper_gradient(hyperparams_vec, i_hyper):
 
     hyper_list = [W0, alphas, gammas]
     res = RMD_parsed(parser, hyper_list, indexed_loss_fun, f_loss) # al posto di training_set e all_idxs
-    #hypergrads = hyperparams.new_vect(hyperparams.vect)
     weights_grad = parser.new_vect(W0 * res[0])
     hypergrads['log_param_scale'] = [np.sum(weights_grad[name])
                                      for name in weights_grad.names]
@@ -96,7 +92,7 @@ def hyper_gradient(hyperparams_vec, i_hyper):
 
 
 final_result = hyper_adam(hyper_gradient, hyperparams.vect, N_meta_iter, meta_alpha)
-final_hyper = hyperparams.new_vect(final_result)
+final_hyper  = hyperparams.new_vect(final_result)
 
 
 folder_path            = '/home/marco/Documenti/Progetto_DL/results_learning_rate'
@@ -112,12 +108,10 @@ for cur_results, name in zip(final_hyper['log_alphas'].T, parser.names):
         print(name)
         index += 1
 
-
 plt.xlabel('Schedule index', fontdict={'family': 'serif', 'size': 12})
 plt.ylabel('Learning rate', fontdict={'family': 'serif', 'size': 12})
 plt.savefig(alphabeta_schedule, dpi=300)
 plt.close()
-
 
 meta_training_loss = '/home/marco/Documenti/Progetto_DL/results_learning_rate/meta_training_loss.png'
 plt.plot(loss_final, marker = 'o', color = 'blue', markeredgecolor = 'black')
@@ -125,6 +119,3 @@ plt.xlabel('meta iteration', fontdict={'family': 'serif', 'size': 12})
 plt.ylabel('loss', fontdict={'family': 'serif', 'size': 12})
 plt.savefig(meta_training_loss, dpi=300)
 plt.close()
-
-
-
