@@ -92,7 +92,8 @@ def load_alpha(parser, alpha):
         cur_alpha[val] = alpha[i]
     return cur_alpha
 
-def RMD_parsed(parser, hyper_vect, loss, indices):
+#rimosso indices
+def RMD_parsed(parser, hyper_vect, loss, f):
     
     w0, alphas, gammas = hyper_vect
     W, V = ExactRep(w0), ExactRep(np.zeros(w0.size))
@@ -108,7 +109,8 @@ def RMD_parsed(parser, hyper_vect, loss, indices):
         W.add(cur_alpha_vect * V.val)
 
     w_final = W.val
-    d_w = L_grad(W.val, indices) #Bisogna trovare il modo di passare tutti gli indici su cui è stata addestrata
+    f_grad = grad(f)    #f corrisponde alla validation loss del paper, non nostro caso è la training loss
+    d_w = f_grad(W.val) #Questa la calcolano su tutto il training set, quindi non devo fornire indici
 
     d_alphas, d_gammas = np.zeros(alphas.shape), np.zeros(gammas.shape)
     d_v = np.zeros(d_w.shape)

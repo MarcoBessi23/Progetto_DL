@@ -52,6 +52,10 @@ fixed_hyperparams = VectorParser()
 fixed_hyperparams['log_L2_reg'] = np.full(N_weight_types, init_log_L2_reg)
 hypergrads = VectorParser()
 
+loss_final = []
+def f_loss(w):
+    return loss_fun(w, **train_data)
+
 def hyper_gradient(hyperparams_vec, i_hyper):
     '''
     This function takes the hyperparameter vector, the meta iteration and outputs the hypergradient 
@@ -69,23 +73,24 @@ def hyper_gradient(hyperparams_vec, i_hyper):
         idxs = rs.randint(N_train, size=batch_size)
         return loss_fun(w, train_data['X'][idxs], train_data['T'][idxs], L2_reg)
 
-    def training_set(i_hyper):
-        idx_set = set()
-        for i in range(100):
-            rs = RandomState((seed, i_hyper, i))
-            batch = rs.randint(N_train, size=batch_size)
-            idx_set.update(batch)
-
-        return list(idx_set)
+    #def training_set(i_hyper):
+    #    idx_set = set()
+    #    for i in range(100):
+    #        rs = RandomState((seed, i_hyper, i))
+    #        batch = rs.randint(N_train, size=batch_size)
+    #        idx_set.update(batch)
+#
+    #    return list(idx_set)
 
     hyper_list = [W0, alphas, gammas]
-    res = RMD_parsed(parser, hyper_list, indexed_loss_fun, training_set(i_hyper) )
+    res = RMD_parsed(parser, hyper_list, indexed_loss_fun, f_loss) # al posto di training_set e all_idxs
     #hypergrads = hyperparams.new_vect(hyperparams.vect)
     weights_grad = parser.new_vect(W0 * res[0])
     hypergrads['log_param_scale'] = [np.sum(weights_grad[name])
                                      for name in weights_grad.names]
     hypergrads['log_alphas']      =  res[1] * alphas
     hypergrads['invlogit_gammas'] = (res[2] * d_logit(cur_hyperparams['invlogit_gammas']))
+    loss_final.append(f_loss(res[3]))
 
     return hypergrads.vect
 
@@ -112,3 +117,14 @@ plt.xlabel('Schedule index', fontdict={'family': 'serif', 'size': 12})
 plt.ylabel('Learning rate', fontdict={'family': 'serif', 'size': 12})
 plt.savefig(alphabeta_schedule, dpi=300)
 plt.close()
+
+
+meta_training_loss = '/home/marco/Documenti/Progetto_DL/results_learning_rate/meta_training_loss.png'
+plt.plot(loss_final, marker = 'o', color = 'blue', markeredgecolor = 'black')
+plt.xlabel('meta iteration', fontdict={'family': 'serif', 'size': 12})
+plt.ylabel('loss', fontdict={'family': 'serif', 'size': 12})
+plt.savefig(meta_training_loss, dpi=300)
+plt.close()
+
+
+
