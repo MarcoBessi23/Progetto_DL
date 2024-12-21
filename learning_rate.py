@@ -21,7 +21,7 @@ def d_logit(x):
 
 layer_sizes = [784, 50, 50, 50, 10]
 batch_size = 200
-N_iters = 10
+N_iters = 100
 N_classes = 10
 N_train = 10000
 N_valid = 10000
@@ -35,7 +35,7 @@ init_log_param_scale = -3.0
 
 # ----- Superparameters -----
 meta_alpha = 0.04
-N_meta_iter = 2
+N_meta_iter = 50
 
 seed = 0
 train_data, valid_data, tests_data = load_data_dicts(N_train, N_valid, N_tests)
@@ -43,11 +43,14 @@ parser, pred_fun, loss_fun = make_nn_funs(layer_sizes)
 N_weight_types = len(parser.names)
 hyperparams = VectorParser()
 hyperparams['log_param_scale'] = np.full(N_weight_types, init_log_param_scale)
+print(np.shape(hyperparams['log_param_scale']))
 hyperparams['log_alphas']      = np.full((N_iters, N_weight_types), init_log_alphas)
+print(np.shape(hyperparams['log_alphas']))
 hyperparams['invlogit_gammas']  = np.full((N_iters, N_weight_types), init_invlogit_betas)
+print(np.shape(hyperparams['invlogit_gammas']))
 fixed_hyperparams = VectorParser()
 fixed_hyperparams['log_L2_reg'] = np.full(N_weight_types, init_log_L2_reg)
-
+hypergrads = VectorParser()
 
 def hyper_gradient(hyperparams_vec, i_hyper):
     '''
@@ -74,17 +77,38 @@ def hyper_gradient(hyperparams_vec, i_hyper):
             idx_set.update(batch)
 
         return list(idx_set)
-    
+
     hyper_list = [W0, alphas, gammas]
     res = RMD_parsed(parser, hyper_list, indexed_loss_fun, training_set(i_hyper) )
-    hypergrads = hyperparams.empty_copy()
-    print(hypergrads.idxs_and_shapes)
+    #hypergrads = hyperparams.new_vect(hyperparams.vect)
     weights_grad = parser.new_vect(W0 * res[0])
     hypergrads['log_param_scale'] = [np.sum(weights_grad[name])
-                                     for name in parser.names]
-    hypergrads['log_alphas']      = res[1] * alphas
-    hypergrads['invlogit_gammas']  = (res[2] * d_logit(cur_hyperparams['invlogit_gammas']))
+                                     for name in weights_grad.names]
+    hypergrads['log_alphas']      =  res[1] * alphas
+    hypergrads['invlogit_gammas'] = (res[2] * d_logit(cur_hyperparams['invlogit_gammas']))
+
     return hypergrads.vect
 
+
 final_result = hyper_adam(hyper_gradient, hyperparams.vect, N_meta_iter, meta_alpha)
-print(type(final_result))
+final_hyper = hyperparams.new_vect(final_result)
+
+
+folder_path            = '/home/marco/Documenti/Progetto_DL/results_learning_rate'
+alphabeta_schedule     = os.path.join(folder_path, "learning_schedule_exact.png")
+
+
+colors = ['blue', 'green', 'red', 'deepskyblue']
+index = 0
+for cur_results, name in zip(final_hyper['log_alphas'].T, parser.names):
+    if name[0] == 'weights':
+        plt.plot(np.exp(cur_results), 'o-', color = colors[index], markeredgecolor='black' )
+        print(colors[index])
+        print(name)
+        index += 1
+
+
+plt.xlabel('Schedule index', fontdict={'family': 'serif', 'size': 12})
+plt.ylabel('Learning rate', fontdict={'family': 'serif', 'size': 12})
+plt.savefig(alphabeta_schedule, dpi=300)
+plt.close()

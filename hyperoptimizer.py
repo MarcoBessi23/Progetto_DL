@@ -117,7 +117,7 @@ def RMD_parsed(parser, hyper_vect, loss, indices):
     #L_hvp_meta = grad(grad_proj, 1)  # Returns a size(meta) output.
 
     for i, alpha, gamma in iters[::-1]:
-        print(f'step{i}')
+        print(f'back step{i}')
         cur_alpha_vect = fill_parser(parser, alpha)
         cur_gamma_vect  = fill_parser(parser, gamma)
         for j, (_, (ixs, _)) in enumerate(parser.idxs_and_shapes.items()):
@@ -385,8 +385,10 @@ def hyper_adam(grad, x, num_iters=100,
     m = np.zeros(len(x))
     v = np.zeros(len(x))
     for i in range(num_iters):
+        print(f'::::::::::::::META ITERATION {i}::::::::::::::::::::')
         b1t = 1 - (1-b1)*(lam**i)
         g = grad(x, i)
+
         m = b1t*g     + (1-b1t)*m   # First  moment estimate
         v = b2*(g**2) + (1-b2)*v    # Second moment estimate
         mhat = m/(1-(1-b1)**(i+1))  # Bias correction
