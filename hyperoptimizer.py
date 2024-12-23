@@ -309,26 +309,29 @@ def L2_RMD(w, v, L2, loss, f, gammas, alphas, T, batches, only_forward = True):
             'hg_L2': d_L2}
 
 
-def data_RMD(w, v, L2, loss, f , gammas, alphas, T, batches, meta):
 
-    W = ExactRep(w)
-    V = ExactRep(v)
+
+def data_RMD(loss, f , T, batches, w0, v0, gammas, alphas,  meta):
+
+    W = ExactRep(w0)
+    V = ExactRep(v0)
 
     iter_per_epoch = len(batches)
     num_epochs = int(T/len(batches)) + 1
     iters = list(zip(range(T), alphas, gammas, batches*num_epochs))
     
-    learning_curve = []
+    learning_curve   = []
     validation_curve = []
     L_grad      = grad(loss)    # Gradient wrt parameters.
     M_grad      = grad(f)       # Gradient wrt parameters.
     L_meta_grad = grad(loss, 1) # Gradient wrt metaparameters.
     M_meta_grad = grad(f, 1)    # Gradient wrt metaparameters.
-    L_hvp      = grad(lambda w, d, idxs:
+    L_hvp       = grad(lambda w, d, idxs:
                       np.dot(L_grad(w, meta, idxs), d))    # Hessian-vector product.
-    L_hvp_meta = grad(lambda w, meta, d, idxs:
+    L_hvp_meta  = grad(lambda w, meta, d, idxs:
                       np.dot(L_grad(w, meta, idxs), d), 1) # Returns a size(meta) output.
     learning_curve = [loss(W.val, meta, batches.all_idxs)]
+    
     #forward
     for i, alpha, gamma, batch in iters:
         print(f'forward iteration {i}')
@@ -339,37 +342,47 @@ def data_RMD(w, v, L2, loss, f , gammas, alphas, T, batches, meta):
         learning_curve.append(loss(W.val, meta, batches.all_idxs))
         validation_curve.append(loss(W.val, meta, batches.all_idxs))
 
-    final_loss = loss(W.val, meta, batches.all_idxs)
-    final_params = W.val
+    final_loss     = loss(W.val, meta, batches.all_idxs)
+    final_val_loss = f(W.val, meta)
+    final_params   = W.val
+    
     dL_w = L_grad(W.val, meta, batches.all_idxs)
     dL_v = np.zeros(dL_w.shape)
-    dM_w = M_grad(W.val)            #maybe you have to change meta_loss to take meta as a variable
+
+    dM_w = M_grad(W.val, meta)
     dM_v = np.zeros(dL_w.shape)
+
     dL_data = L_meta_grad(W.val, meta, batches.all_idxs)
-    dM_data = np.zeros(dL_data.shape)
-    #dM_data = M_meta_grad(W.val)    #same as above
+    dM_data = M_meta_grad(W.val, meta)    #forse va inizializzata matrice di zeri
+    dM_data = np.zeros_like(dM_data)
 
     for i, alpha, gamma, batch in iters[::-1]:
         print(f'backprop step {i}')
-    
-        #exact gradient descent reversion
-        g = L_grad(W.val, meta, batch)
-        W.sub(alpha*V.val)
-        V.add((1-gamma) * g)
-        V.div(gamma)
+
         dL_v += alpha * dL_w
         dM_v += alpha * dM_w
+        
+        #exact gradient descent reversion
+        W.sub(alpha * V.val)
+        g = L_grad(W.val, meta, batch)
+        V.add((1-gamma) * g)
+        V.div(gamma)
+        
         dL_w -= (1-gamma)*L_hvp(W.val, dL_v, batch)
         dM_w -= (1-gamma)*L_hvp(W.val, dM_v, batch)
+
+
         dL_data -= (1-gamma)*L_hvp_meta(W.val, meta, dL_v, batch)
-        dM_data = (1-gamma)*L_hvp_meta(W.val, meta, dM_v, batch)
-        #dM_data -= (1-gamma)*L_hvp_meta(W.val, L2, dM_v, batch)
+        dM_data  = (1-gamma)*L_hvp_meta(W.val, meta, dM_v, batch)
         dL_v *= gamma
         dM_v *= gamma
-    
-    return {'learning_curve': learning_curve,
+
+    assert np.all(ExactRep(w0).val == W.val)
+    return {'w_final':final_params,
+            'learning_curve': learning_curve,
             'validation_curve': validation_curve,
-            'loss':final_loss,
+            'final_loss':final_loss,
+            'final_val_loss':final_val_loss,
             'param': final_params,
             'hL_w': dL_w,
             'hL_v': dL_v,
