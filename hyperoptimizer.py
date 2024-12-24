@@ -1,6 +1,5 @@
 import autograd.numpy as np
 from autograd import grad
-from fractions import Fraction
 from collections import deque
 from time import time
 from neuralNet import VectorParser, fill_parser
@@ -317,11 +316,11 @@ def data_RMD(loss, f , T, batches, w0, v0, gammas, alphas,  meta):
     V = ExactRep(v0)
 
     iter_per_epoch = len(batches)
-    num_epochs = int(T/len(batches)) + 1
+    #num_epochs = int(T/len(batches)) + 1
+    num_epochs = T//len(batches) + 1
     iters = list(zip(range(T), alphas, gammas, batches*num_epochs))
-    
-    learning_curve   = []
-    validation_curve = []
+    #learning_curve   = []
+    #validation_curve = []
     L_grad      = grad(loss)    # Gradient wrt parameters.
     M_grad      = grad(f)       # Gradient wrt parameters.
     L_meta_grad = grad(loss, 1) # Gradient wrt metaparameters.
@@ -335,32 +334,28 @@ def data_RMD(loss, f , T, batches, w0, v0, gammas, alphas,  meta):
     #forward
     for i, alpha, gamma, batch in iters:
         print(f'forward iteration {i}')
-        g = L_grad(W.val, meta, batch)
         V.mul(gamma)
+        g = L_grad(W.val, meta, batch)
         V.sub((1-gamma)*g)
         W.add(alpha*V.val)        
         learning_curve.append(loss(W.val, meta, batches.all_idxs))
-        validation_curve.append(loss(W.val, meta, batches.all_idxs))
+        #validation_curve.append(loss(W.val, meta, batches.all_idxs))
 
+    final_params   = W.val
+    dL_w = L_grad(W.val, meta, batches.all_idxs)
+    dM_w = M_grad(W.val, meta)
     final_loss     = loss(W.val, meta, batches.all_idxs)
     final_val_loss = f(W.val, meta)
-    final_params   = W.val
-    
-    dL_w = L_grad(W.val, meta, batches.all_idxs)
     dL_v = np.zeros(dL_w.shape)
-
-    dM_w = M_grad(W.val, meta)
-    dM_v = np.zeros(dL_w.shape)
-
+    dM_v = np.zeros(dM_w.shape)
     dL_data = L_meta_grad(W.val, meta, batches.all_idxs)
     dM_data = M_meta_grad(W.val, meta)    #forse va inizializzata matrice di zeri
-    dM_data = np.zeros_like(dM_data)
-
+    
     for i, alpha, gamma, batch in iters[::-1]:
         print(f'backprop step {i}')
 
-        dL_v += alpha * dL_w
-        dM_v += alpha * dM_w
+        dL_v +=  dL_w * alpha
+        dM_v +=  dM_w * alpha
         
         #exact gradient descent reversion
         W.sub(alpha * V.val)
@@ -370,17 +365,15 @@ def data_RMD(loss, f , T, batches, w0, v0, gammas, alphas,  meta):
         
         dL_w -= (1-gamma)*L_hvp(W.val, dL_v, batch)
         dM_w -= (1-gamma)*L_hvp(W.val, dM_v, batch)
-
-
         dL_data -= (1-gamma)*L_hvp_meta(W.val, meta, dL_v, batch)
-        dM_data  = (1-gamma)*L_hvp_meta(W.val, meta, dM_v, batch)
+        dM_data -= (1-gamma)*L_hvp_meta(W.val, meta, dM_v, batch)
         dL_v *= gamma
         dM_v *= gamma
 
     assert np.all(ExactRep(w0).val == W.val)
     return {'w_final':final_params,
             'learning_curve': learning_curve,
-            'validation_curve': validation_curve,
+            #'validation_curve': validation_curve,
             'final_loss':final_loss,
             'final_val_loss':final_val_loss,
             'param': final_params,

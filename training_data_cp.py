@@ -76,6 +76,13 @@ def test_loss_fun(w):                         # To measure actual performance.
 log_alphas  = np.full(N_iters, log_alpha_0)
 gammas      = np.full(N_iters, gamma_0)
 
+
+def hypergrad_fake_cp():
+    pass
+
+
+
+
 output = []
 for i in range(N_meta_iter):
     print(f'--------------META ITERATION {i} ------------------------------')
@@ -84,6 +91,9 @@ for i in range(N_meta_iter):
     w0 = npr.randn(N_weights) * np.exp(log_param_scale)
 
     results = data_RMD(indexed_loss_fun, meta_loss_fun, N_iters, batch_idxs, 
+                       w0, v0, gammas, np.exp(log_alphas), metas)
+
+    results = hypergrad_fake_cp(indexed_loss_fun, meta_loss_fun, N_iters, batch_idxs, 
                        w0, v0, gammas, np.exp(log_alphas), metas)
 
     learning_curve = results['learning_curve']
@@ -116,4 +126,3 @@ cbar.ax.set_yticklabels(['{:2.2f}'.format(immin), '0', '{:2.2f}'.format(immax)])
 
 plt.savefig('/home/marco/Documenti/Progetto_DL/fakeData/fake_data.png')
 plt.close()
-

@@ -148,7 +148,7 @@ def make_nn_funs(layer_sizes):
         return cur_units
 
     def loss(W_vect, X, T, L2_reg=0.0):
-        # TODO: consider treating L2_reg as a matrix
+        
         log_prior = -np.dot(W_vect * L2_reg, W_vect)
         log_lik = np.sum(predictions(W_vect, X) * T) / X.shape[0]
         return - log_prior - log_lik
@@ -210,24 +210,24 @@ def make_nn_funs(layer_sizes):
 import matplotlib.pyplot as plt
 import matplotlib
 
-def plot_images(images, ax, ims_per_row=5, padding=5, digit_dimensions=(28,28),
-                cmap=matplotlib.cm.binary, vmin=None):
+def plot_images(images, ax, ims_per_row = 5, padding = 5, digit_dimensions = (28,28),
+                cmap = matplotlib.cm.binary, vmin = None):
 
-    """iamges should be a (N_images x pixels) matrix."""
+    """images should be a (N_images x pixels) matrix."""
     N_images = images.shape[0]
-    N_rows = int(np.ceil(float(N_images) / ims_per_row))
+    N_rows   = int(np.ceil(float(N_images) / ims_per_row))
     pad_value = np.min(images.ravel())
     concat_images = np.full(((digit_dimensions[0] + padding) * N_rows + padding,
                             (digit_dimensions[0] + padding) * ims_per_row + padding), pad_value)
     for i in range(N_images):
-        cur_image = -np.reshape(images[i, :], digit_dimensions)
+        cur_image = np.reshape(images[i, :], digit_dimensions)
         row_ix = i // ims_per_row  # Integer division.
         col_ix = i % ims_per_row
         row_start = padding + (padding + digit_dimensions[0])*row_ix
         col_start = padding + (padding + digit_dimensions[0])*col_ix
         concat_images[row_start: row_start + digit_dimensions[0],
                       col_start: col_start + digit_dimensions[0]] = cur_image
-    cax = ax.matshow(concat_images, cmap=cmap, vmin=vmin)
+    cax = ax.matshow(concat_images, cmap = cmap, vmin = vmin)
     plt.xticks(np.array([]))
     plt.yticks(np.array([]))
     return cax
