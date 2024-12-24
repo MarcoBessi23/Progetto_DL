@@ -315,12 +315,8 @@ def data_RMD(loss, f , T, batches, w0, v0, gammas, alphas,  meta):
     W = ExactRep(w0)
     V = ExactRep(v0)
 
-    iter_per_epoch = len(batches)
-    #num_epochs = int(T/len(batches)) + 1
     num_epochs = T//len(batches) + 1
     iters = list(zip(range(T), alphas, gammas, batches*num_epochs))
-    #learning_curve   = []
-    #validation_curve = []
     L_grad      = grad(loss)    # Gradient wrt parameters.
     M_grad      = grad(f)       # Gradient wrt parameters.
     L_meta_grad = grad(loss, 1) # Gradient wrt metaparameters.
@@ -339,8 +335,7 @@ def data_RMD(loss, f , T, batches, w0, v0, gammas, alphas,  meta):
         V.sub((1-gamma)*g)
         W.add(alpha*V.val)        
         learning_curve.append(loss(W.val, meta, batches.all_idxs))
-        #validation_curve.append(loss(W.val, meta, batches.all_idxs))
-
+    
     final_params   = W.val
     dL_w = L_grad(W.val, meta, batches.all_idxs)
     dM_w = M_grad(W.val, meta)
@@ -349,7 +344,7 @@ def data_RMD(loss, f , T, batches, w0, v0, gammas, alphas,  meta):
     dL_v = np.zeros(dL_w.shape)
     dM_v = np.zeros(dM_w.shape)
     dL_data = L_meta_grad(W.val, meta, batches.all_idxs)
-    dM_data = M_meta_grad(W.val, meta)    #forse va inizializzata matrice di zeri
+    dM_data = M_meta_grad(W.val, meta)
     
     for i, alpha, gamma, batch in iters[::-1]:
         print(f'backprop step {i}')
@@ -373,7 +368,6 @@ def data_RMD(loss, f , T, batches, w0, v0, gammas, alphas,  meta):
     assert np.all(ExactRep(w0).val == W.val)
     return {'w_final':final_params,
             'learning_curve': learning_curve,
-            #'validation_curve': validation_curve,
             'final_loss':final_loss,
             'final_val_loss':final_val_loss,
             'param': final_params,

@@ -5,6 +5,7 @@ from dataloader import load_data
 import autograd.numpy.random as npr
 from autograd import grad
 import matplotlib.pyplot as plt
+from checkpointing import BinomialCKP, adjust, maxrange, ActionType, numforw
 
 # ----- Initial values of continuous hyper-parameters -----
 init_log_L2_reg = np.log(0.01)
@@ -21,7 +22,7 @@ log_param_scale = -4
 # ----- Discrete training hyper-parameters -----
 layer_sizes = [784, 10]
 batch_size = 10
-N_iters = 20
+nSteps = 20
 N_classes = 10
 
 # ----- Variables for meta-optimization -----
@@ -73,12 +74,94 @@ def meta_loss_fun(w, meta_params):            # To be optimized in the outer loo
 def test_loss_fun(w):                         # To measure actual performance.
     return loss_fun(w, X = test_images, T = test_labels)
 
-log_alphas  = np.full(N_iters, log_alpha_0)
-gammas      = np.full(N_iters, gamma_0)
+log_alphas  = np.full(nSteps, log_alpha_0)
+gammas      = np.full(nSteps, gamma_0)
 
 
-def hypergrad_fake_cp():
-    pass
+def hypergrad_fake_cp(loss, f , T, batches, w0, v0, gammas, alphas,  meta):
+    
+    w,v = np.copy(w0), np.copy(v0)
+    num_epochs = T//len(batches) + 1
+    iters = list(zip(range(T), alphas, gammas, batches*num_epochs))
+    L_grad      = grad(loss)    # Gradient wrt parameters.
+    M_grad      = grad(f)       # Gradient wrt parameters.
+    L_meta_grad = grad(loss, 1) # Gradient wrt metaparameters.
+    M_meta_grad = grad(f, 1)    # Gradient wrt metaparameters.
+    L_hvp       = grad(lambda w, d, idxs:
+                      np.dot(L_grad(w, meta, idxs), d))    # Hessian-vector product.
+    L_hvp_meta  = grad(lambda w, meta, d, idxs:
+                      np.dot(L_grad(w, meta, idxs), d), 1) # Returns a size(meta) output.
+    #learning_curve = [loss(w, meta, batches.all_idxs)]
+
+
+
+    scheduler = BinomialCKP(nSteps)
+    stack     = [{} for _ in range(scheduler.snaps)]    
+    
+    def forward(check, nfrom, nto):
+        w = np.copy(stack[check]['weights'])
+        v = np.copy(stack[check]['velocity'])
+
+        for i, alpha, gamma, batch in iters[nfrom:nto]:
+            print(f'forward iteration {i}')
+            v *= gamma
+            g  = L_grad(w, meta, batch)
+            v -= (1-gamma) * g
+            w += alpha * v
+            
+        return w, v
+
+    def reverse(iteration, w, v, dL_w, dM_w, dL_v, dM_v, dL_data, dM_data):
+        
+        i, alpha, gamma, batch = iters[iteration]
+        print(f'backprop step {i}')
+        dL_v +=  dL_w * alpha
+        dM_v +=  dM_w * alpha
+        dL_w -= (1-gamma)*L_hvp(w, dL_v, batch)
+        dM_w -= (1-gamma)*L_hvp(w, dM_v, batch)
+        dL_data -= (1-gamma)*L_hvp_meta(w, meta, dL_v, batch)
+        dM_data -= (1-gamma)*L_hvp_meta(w, meta, dM_v, batch)
+        dL_v *= gamma
+        dM_v *= gamma
+
+        return dL_w, dM_w, dL_v, dM_v, dL_data, dM_data
+    
+    while True:
+        action = scheduler.revolve()
+        if action == ActionType.advance:
+            #print(f'advance the system from {scheduler.oldcapo} to {scheduler.capo}')
+            w, v = forward(scheduler.check, scheduler.oldcapo, scheduler.capo)
+        elif action == ActionType.takeshot:
+            #print('saving current state')
+            #print(scheduler.check)
+            stack[scheduler.check]['weights']  = np.copy(w)
+            stack[scheduler.check]['velocity'] = np.copy(v)
+            
+            #print(v[0:4])
+        elif action == ActionType.firsturn:
+            wF, vF = forward(scheduler.check, scheduler.oldcapo, nSteps)
+            dL_w = L_grad(wF, meta, batches.all_idxs)
+            dM_w = M_grad(wF, meta)
+            final_loss     = loss(wF, meta, batches.all_idxs)
+            final_val_loss = f(wF, meta)
+            dL_v = np.zeros(dL_w.shape)
+            dM_v = np.zeros(dM_w.shape)
+            dL_data = L_meta_grad(wF, meta, batches.all_idxs)
+            dM_data = M_meta_grad(wF, meta)
+        elif action == ActionType.restore:
+            #print(f'loading state number {scheduler.check}')
+            w, v = np.copy(stack[scheduler.check]['weights']), np.copy(stack[scheduler.check]['velocity'])
+            #print('valore di v che viene richiamato con restore')
+            #print(v[0:4]) 
+        elif action == ActionType.youturn:
+            #print(f' doing reverse step at time {scheduler.fine}')
+            dL_w, dM_w, dL_v, dM_v, dL_data, dM_data = reverse(scheduler.fine, w, v, dL_w, dM_w, dL_v, dM_v, 
+                                                               dL_data, dM_data)
+        if action == ActionType.terminate:
+            break
+
+    
+    return final_val_loss, wF, dL_w, dM_w, dL_v, dM_v, dL_data, dM_data
 
 
 
@@ -90,21 +173,17 @@ for i in range(N_meta_iter):
     v0 = npr.randn(N_weights) * velocity_scale
     w0 = npr.randn(N_weights) * np.exp(log_param_scale)
 
-    results = data_RMD(indexed_loss_fun, meta_loss_fun, N_iters, batch_idxs, 
+    results = hypergrad_fake_cp(indexed_loss_fun, meta_loss_fun, nSteps, batch_idxs, 
                        w0, v0, gammas, np.exp(log_alphas), metas)
 
-    results = hypergrad_fake_cp(indexed_loss_fun, meta_loss_fun, N_iters, batch_idxs, 
-                       w0, v0, gammas, np.exp(log_alphas), metas)
-
-    learning_curve = results['learning_curve']
-    validation_loss = results['final_val_loss']
+    validation_loss = results[0]
     fake_data_scale = np.std(hyperparser.get(metas, 'fake_data')) / true_data_scale
-    test_loss = test_loss_fun(results['w_final'])
-    output.append((learning_curve, validation_loss, test_loss,
+    test_loss = test_loss_fun(results[1])
+    output.append((validation_loss, test_loss,
                     hyperparser.get(metas, 'fake_data'), fake_data_scale,
                     np.exp(hyperparser.get(metas, 'log_L2_reg')[0])))
 
-    metas -= results['hM_data'] * meta_stepsize
+    metas -= results[7] * meta_stepsize
     
 import matplotlib.pyplot as plt
 import matplotlib
@@ -117,12 +196,12 @@ fig.add_axes(ax)
 print('lunghezza output')
 print(len(output))
 all_fakedata = output[-1]
-images = all_fakedata[3]
+images = all_fakedata[2]
 immin  = np.min(images.ravel())
 immax  = np.max(images.ravel())
 cax    = plot_images(images, ax, ims_per_row=5, padding=2)
 cbar   = fig.colorbar(cax, ticks=[immin, 0, immax], shrink=.7)
 cbar.ax.set_yticklabels(['{:2.2f}'.format(immin), '0', '{:2.2f}'.format(immax)])
 
-plt.savefig('/home/marco/Documenti/Progetto_DL/fakeData/fake_data.png')
+plt.savefig('/home/marco/Documenti/Progetto_DL/fakeData/fake_data_cp.png')
 plt.close()
