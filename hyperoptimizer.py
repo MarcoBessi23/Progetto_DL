@@ -209,103 +209,74 @@ def multi_RMD(w, v, parser, loss, f, gammas, alphas, T, batches, only_forw):
             'hg_alpha':d_alpha   }
 
 
-def L2_RMD(w, v, L2, loss, f, gammas, alphas, T, batches, only_forward = True):
+def L2_RMD(loss, f , T, batches, w0, v0, gammas, alphas,  meta):
 
-    '''
-    SGD with momentum and reverse mode differentiation
-    input:
-    w: model parameter
-    v: velocity parameter
-    loss: training loss
-    f: validation loss
-    alphas: step size hypers
-    gammas: velocity update hyper
-    theta: regularization hyper
-    T: total number of iterations
-    output:
-    The gradient of validation function wrt the initial w and v, gammas and alphas
-    '''
+    W = ExactRep(w0)
+    V = ExactRep(v0)
 
-    W = ExactRep(w)
-    V = ExactRep(v)
-    num_epochs = int(T/len(batches)) + 1
-    gradient = grad(loss)
-    iters = list(zip(range(T), alphas, gammas, batches * num_epochs))
-    learning_curve = []
-
+    num_epochs = T//len(batches) + 1
+    iters = list(zip(range(T), alphas, gammas, batches*num_epochs))
+    L_grad      = grad(loss)    # Gradient wrt parameters.
+    M_grad      = grad(f)       # Gradient wrt parameters.
+    L_meta_grad = grad(loss, 1) # Gradient wrt metaparameters.
+    M_meta_grad = grad(f, 1)    # Gradient wrt metaparameters.
+    L_hvp       = grad(lambda w, d, idxs:
+                      np.dot(L_grad(w, meta, idxs), d))    # Hessian-vector product.
+    L_hvp_meta  = grad(lambda w, meta, d, idxs:
+                      np.dot(L_grad(w, meta, idxs), d), 1) # Returns a size(meta) output.
+    learning_curve = [loss(W.val, meta, batches.all_idxs)]
+    
     #forward
     for i, alpha, gamma, batch in iters:
         print(f'forward iteration {i}')
-        g = gradient(W.val, L2, batch)
-        print(type(g))
-        #print('gradiente')
-        #print(np.max(g))
-        #print(np.isnan(g).any())
         V.mul(gamma)
-        #print('V1')
-        #print(np.isnan(V.val).any())
+        g = L_grad(W.val, meta, batch)
         V.sub((1-gamma)*g)
-        #print('V2')
-        #print(np.isnan(V.val).any())
-        W.add(alpha*V.val)
-        #print('W')
-        #print(np.max(W.val))
-        learning_curve.append(loss(W.val, L2, batches.all_idxs))
-
-    final_loss = loss(W.val, L2, batches.all_idxs)
-    final_param = W.val
-
-    if only_forward:
-        return final_param
-
-    l_grad = grad(f)
-    d_w = l_grad(W.val, L2, batches.all_idxs)
-    fun = lambda w, L2, idx, d: np.dot(l_grad(w, L2, idx),d)
-    hyper_gradient_w = grad(fun, 0)
-    hyper_gradient_L2 = grad(fun, 1)
-
-    d_v = np.zeros_like(w)
-    d_L2 = np.zeros_like(w)
-
-
-    #backprop 
-    for t, alpha, gamma, batch in iters[::-1]:
-        print(f'backprop step {t}')
+        W.add(alpha*V.val)        
+        learning_curve.append(loss(W.val, meta, batches.all_idxs))
     
-        #exact gradient descent reversion
-        g = gradient(W.val, L2, batch)
-        print('Maximum Gradient')
-        print(np.max(g))
-        print('w')
-        W.sub(alpha*V.val)
-        print('V1')
-        V.add((1-gamma)*g)
-        print('V2')
-        V.div(gamma)
-        print(np.max(V.val))
+    final_params   = W.val
+    dL_w = L_grad(W.val, meta, batches.all_idxs)
+    dM_w = M_grad(W.val, meta)
+    final_loss = loss(W.val, meta, batches.all_idxs)
+    M_final    = f(final_params, meta)
+    dL_v = np.zeros(dL_w.shape)
+    dM_v = np.zeros(dM_w.shape)
+    dL_meta = L_meta_grad(W.val, meta, batches.all_idxs)
+    dM_meta = M_meta_grad(W.val, meta)
+    
+    for i, alpha, gamma, batch in iters[::-1]:
+        print(f'backprop step {i}')
+
+        dL_v +=  dL_w * alpha
+        dM_v +=  dM_w * alpha
         
+        #exact gradient descent reversion
+        W.sub(alpha * V.val)
+        g = L_grad(W.val, meta, batch)
+        V.add((1-gamma) * g)
+        V.div(gamma)
+        
+        dL_w -= (1-gamma)*L_hvp(W.val, dL_v, batch)
+        dM_w -= (1-gamma)*L_hvp(W.val, dM_v, batch)
+        dL_meta -= (1-gamma)*L_hvp_meta(W.val, meta, dL_v, batch)
+        dM_meta -= (1-gamma)*L_hvp_meta(W.val, meta, dM_v, batch)
+        dL_v *= gamma
+        dM_v *= gamma
 
-        print('d_v')
-        d_v += alpha*d_w
-        print(np.max(d_v))
-        print('d_w')
-        d_w -= (1-gamma)*hyper_gradient_w(W.val, L2, batch, d_v)
-        print(np.max(d_w))
-        print('d_L2')
-        d_L2 -= (1-gamma)*hyper_gradient_L2(W.val, L2, batch, d_v)
-        print(np.max(d_L2))
-        print('gamma x d_v')
-        d_v *= gamma
-        print(d_v)
+    assert np.all(ExactRep(w0).val == W.val)
+    return {'w_final':final_params,
+            'learning_curve': learning_curve,
+            'final_loss':final_loss,
+            'M_final': M_final,
+            'param': final_params,
+            'hL_w': dL_w,
+            'hL_v': dL_v,
+            'hM_w': dM_w,
+            'hM_v': dM_v,
+            'hL_meta': dL_meta,
+            'hM_meta': dM_meta }
 
-
-
-    return {'learning curve': learning_curve,
-            'loss':final_loss,
-            'param': final_param,
-            'hg_w':d_w,
-            'hg_v': d_v,
-            'hg_L2': d_L2}
 
 
 

@@ -193,7 +193,6 @@ def hyper_grad_lr(hyperparam_vec, i_hyper):
             d_alpha, d_gamma = np.zeros(alphas.shape), np.zeros(gammas.shape)
             d_w = f_grad(wF)
             d_v = np.zeros(d_w.shape)
-            
         elif action == ActionType.restore:
             #print(f'loading state number {scheduler.check}')
             w, v = np.copy(stack[scheduler.check]['weights']), np.copy(stack[scheduler.check]['velocity'])
@@ -205,39 +204,6 @@ def hyper_grad_lr(hyperparam_vec, i_hyper):
         if action == ActionType.terminate:
             break
 
-
-    #while(True):
-    #    action = scheduler.revolve()
-    #    print(action)
-    #    if action == ActionType.advance:
-    #        #print(f'advance the system from {scheduler.oldcapo} to {scheduler.capo}')
-    #        w, v = forward(scheduler.check, scheduler.oldcapo, scheduler.capo)
-    #    elif action == ActionType.takeshot:
-    #        #print('saving current state')
-    #        #print(scheduler.check)
-    #        stack[scheduler.check]['weights']  = np.copy(w)
-    #        stack[scheduler.check]['velocity'] = np.copy(v)
-    #    elif action == ActionType.firsturn:
-    #        print('executing first reverse step')
-    #        wF, vF = forward(scheduler.check, scheduler.oldcapo, nSteps)
-    #        final_loss = f(wF)
-    #        loss_final.append(final_loss)
-    #        #initialise gradient values
-    #        d_alpha, d_gamma = np.zeros(alphas.shape), np.zeros(gammas.shape)
-    #        d_w = f_grad(wF)
-    #        d_v = np.zeros(d_w.shape)
-    #        #first step
-    #        #d_w, d_v, d_alpha, d_gamma = reverse(nSteps-1, wF, vF, d_w, d_v, d_alpha, d_gamma)
-    #    elif action == ActionType.restore:
-    #        #print(f'loading state number {scheduler.check}')
-    #        w, v = stack[scheduler.check]['weights'], stack[scheduler.check]['velocity']
-    #    elif action == ActionType.youturn:
-    #        #print(f' doing reverse step at time {scheduler.fine}')
-    #        d_w, d_v, d_alpha, d_gamma = reverse(scheduler.fine, w, v, d_w, d_v, d_alpha, d_gamma)
-    #    if action == ActionType.terminate:
-    #        break
-
-    #assert np.all(w_0 == w)
     weights_grad = parser.new_vect(w_0 * d_w)
     hypergrads['log_param_scale'] = [np.sum(weights_grad[name])
                                      for name in weights_grad.names]

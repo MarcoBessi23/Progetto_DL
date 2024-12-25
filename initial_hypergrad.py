@@ -6,7 +6,6 @@ import autograd.numpy.random as npr
 from autograd import grad
 from autograd.test_util import check_grads
 import matplotlib.pyplot as plt
-import os
 from time import time
 
 def logit(x):
@@ -18,14 +17,16 @@ def inv_logit(y):
 def d_logit(x):
     return logit(x) * (1 - logit(x))
 
-
+# ----- Fixed params -----
 layer_sizes = [784, 50, 50, 50, 10]
 batch_size = 200
-N_iters = 100
+N_iters = 10
 N_classes = 10
 N_train = 10000
 N_valid = 10000
 N_tests = 10000
+#N_learning_checkpoint = 10
+#thin = np.ceil(N_iters/N_learning_checkpoint)
 
 # ----- Initial values of learned hyper-parameters -----
 init_log_L2_reg = -100.0
@@ -34,10 +35,9 @@ init_invlogit_gammas = inv_logit(0.5)
 init_log_param_scale = -3.0
 
 # ----- Superparameters -----
-meta_alpha = 0.04
-N_meta_iter = 50
-
+N_meta_iter = 4 #50
 seed = 0
+
 train_data, valid_data, tests_data = load_data_dicts(N_train, N_valid, N_tests)
 parser, pred_fun, loss_fun = make_nn_funs(layer_sizes)
 N_weight_types = len(parser.names)
@@ -49,7 +49,6 @@ fixed_hyperparams = VectorParser()
 fixed_hyperparams['log_L2_reg'] = np.full(N_weight_types, init_log_L2_reg)
 hypergrads = VectorParser()
 
-loss_final = []
 def f_loss(w):
     return loss_fun(w, **train_data)
 
@@ -77,36 +76,37 @@ def hyper_gradient(hyperparams_vec, i_hyper):
                                      for name in weights_grad.names]
     hypergrads['log_alphas']      =  res[1] * alphas
     hypergrads['invlogit_gammas'] = (res[2] * d_logit(cur_hyperparams['invlogit_gammas']))
-    loss_final.append(f_loss(res[3]))
-
+    
     return hypergrads.vect
 
+initial_hypergrad = hyper_gradient(hyperparams.vect, 0)
+hyper = np.zeros((N_meta_iter, len(initial_hypergrad)))
+for i in range(N_meta_iter):
+    print(i)
+    hyper[i] = hyper_gradient( hyperparams.vect, i)
+    
+avg_hypergrad = np.mean(hyper, axis=0)
+parsed_avg_hypergrad = hyperparams.new_vect(avg_hypergrad)
 
-final_result = hyper_adam(hyper_gradient, hyperparams.vect, N_meta_iter, meta_alpha)
-final_hyper  = hyperparams.new_vect(final_result)
 
+fig = plt.figure(0)
+fig.clf()
+ax = fig.add_subplot(111)
 
-folder_path            = '/home/marco/Documenti/Progetto_DL/results_learning_rate'
-alphabeta_schedule     = os.path.join(folder_path, "learning_schedule_exact.png")
-
-
+#ax = fig.add_subplot(111)
 colors = ['blue', 'green', 'red', 'deepskyblue']
+def layer_name(weight_key):
+    return "Layer {num}".format(num=weight_key[1] + 1)
 index = 0
-for cur_results, name in zip(final_hyper['log_alphas'].T, parser.names):
+for cur_results, name in zip(parsed_avg_hypergrad['log_alphas'].T, parser.names):
     if name[0] == 'weights':
-        plt.plot(np.exp(cur_results), 'o-', color = colors[index], markeredgecolor='black' )
-        print(colors[index])
-        print(name)
+        ax.plot(cur_results, 'o-', label=layer_name(name), color = colors[index], markeredgecolor = 'black')
         index += 1
-
-plt.xlabel('Schedule index', fontdict={'family': 'serif', 'size': 12})
-plt.ylabel('Learning rate', fontdict={'family': 'serif', 'size': 12})
-plt.savefig(alphabeta_schedule, dpi=300)
-plt.close()
-
-meta_training_loss = '/home/marco/Documenti/Progetto_DL/results_learning_rate/meta_training_loss.png'
-plt.plot(loss_final, marker = 'o', color = 'blue', markeredgecolor = 'black')
-plt.xlabel('meta iteration', fontdict={'family': 'serif', 'size': 12})
-plt.ylabel('loss', fontdict={'family': 'serif', 'size': 12})
-plt.savefig(meta_training_loss, dpi=300)
-plt.close()
+#low, high = ax.get_ylim()
+#ax.set_ylim([0, high])
+ax.set_ylabel('Learning rate Gradient')
+ax.set_xlabel('Schedule index')
+ax.set_yticks([0,])
+ax.set_yticklabels(['0',])
+fig.set_size_inches((6,2.5))
+plt.savefig('/home/marco/Documenti/Progetto_DL/initial_hyper_values/exact_rep.png')
