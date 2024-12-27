@@ -20,7 +20,7 @@ def d_logit(x):
 # ----- Fixed params -----
 layer_sizes = [784, 50, 50, 50, 10]
 batch_size = 200
-N_iters = 10
+N_iters = 10 #100
 N_classes = 10
 N_train = 10000
 N_valid = 10000
@@ -102,11 +102,12 @@ for cur_results, name in zip(parsed_avg_hypergrad['log_alphas'].T, parser.names)
     if name[0] == 'weights':
         ax.plot(cur_results, 'o-', label=layer_name(name), color = colors[index], markeredgecolor = 'black')
         index += 1
+        print(np.shape(cur_results))
 #low, high = ax.get_ylim()
 #ax.set_ylim([0, high])
-ax.set_ylabel('Learning rate Gradient')
-ax.set_xlabel('Schedule index')
-ax.set_yticks([0,])
-ax.set_yticklabels(['0',])
-fig.set_size_inches((6,2.5))
-plt.savefig('/home/marco/Documenti/Progetto_DL/initial_hyper_values/exact_rep.png')
+#ax.set_ylabel('Learning rate Gradient')
+#ax.set_xlabel('Schedule index')
+#ax.set_yticks([0,])
+#ax.set_yticklabels(['0',])
+#fig.set_size_inches((6,2.5))
+#plt.savefig('/home/marco/Documenti/Progetto_DL/initial_hyper_values/exact_rep.png')

@@ -91,15 +91,16 @@ def load_alpha(parser, alpha):
         cur_alpha[val] = alpha[i]
     return cur_alpha
 
-#rimosso indices
 def RMD_parsed(parser, hyper_vect, loss, f):
-    
+
     w0, alphas, gammas = hyper_vect
-    W, V = ExactRep(w0), ExactRep(np.zeros(w0.size))
-    iters = list(zip(range(len(alphas)), alphas, gammas))
+    W, V   = ExactRep(w0), ExactRep(np.zeros(w0.size))
+    iters  = list(zip(range(len(alphas)), alphas, gammas))
     L_grad = grad(loss)
     learning_curve = []
+
     for i, alpha, gamma in iters:
+        print(f'forward step {i}')
         g = L_grad(W.val, i)
         cur_alpha_vect = fill_parser(parser, alpha)
         cur_gamma_vect = fill_parser(parser, gamma)
@@ -108,8 +109,8 @@ def RMD_parsed(parser, hyper_vect, loss, f):
         W.add(cur_alpha_vect * V.val)
 
     w_final = W.val
-    f_grad = grad(f)    #f corrisponde alla validation loss del paper, non nostro caso è la training loss
-    d_w = f_grad(W.val) #Questa la calcolano su tutto il training set, quindi non devo fornire indici
+    f_grad  = grad(f)    #f corrisponde alla validation loss del paper, non nostro caso è la training loss
+    d_w     = f_grad(W.val) #Questa la calcolano su tutto il training set, quindi non devo fornire indici
 
     d_alphas, d_gammas = np.zeros(alphas.shape), np.zeros(gammas.shape)
     d_v = np.zeros(d_w.shape)
@@ -120,7 +121,7 @@ def RMD_parsed(parser, hyper_vect, loss, f):
     for i, alpha, gamma in iters[::-1]:
         print(f'back step{i}')
         cur_alpha_vect = fill_parser(parser, alpha)
-        cur_gamma_vect  = fill_parser(parser, gamma)
+        cur_gamma_vect = fill_parser(parser, gamma)
         for j, (_, (ixs, _)) in enumerate(parser.idxs_and_shapes.items()):
             d_alphas[i,j] = np.dot(d_w[ixs], V.val[ixs])
 
@@ -128,7 +129,6 @@ def RMD_parsed(parser, hyper_vect, loss, f):
         g = L_grad(W.val, i)                                 # Evaluate gradient
         V.add((1.0 - cur_gamma_vect) * g)
         V.div(cur_gamma_vect)                                # Reverse momentum update
-
         d_v += d_w * cur_alpha_vect
 
         for j, (_, (ixs, _)) in enumerate(parser.idxs_and_shapes.items()):
@@ -136,77 +136,10 @@ def RMD_parsed(parser, hyper_vect, loss, f):
 
         d_w    -= L_hvp_w(W.val, (1.0 - cur_gamma_vect)*d_v, i)
         d_v    *= cur_gamma_vect
-    
-    
+
+
     assert np.all(ExactRep(w0).val == W.val)
     return d_w, d_alphas, d_gammas, w_final
-
-def multi_RMD(w, v, parser, loss, f, gammas, alphas, T, batches, only_forw):
-    '''
-    Version of RMD in which learning rate has shape like neural network parameters
-    '''
-    W = ExactRep(w)
-    V = ExactRep(v)
-    num_epochs = int(T/len(batches)) + 1
-    gradient = grad(loss)
-    iters = list(zip(range(T), alphas, gammas, batches * num_epochs))
-    learning_curve = []
-
-    #forward
-    for i, alpha, gamma, batch in iters:
-        print(f'forward iteration {i}')
-        g = gradient(W.val, batch)
-        cur_alpha = load_alpha(parser, alpha)
-        cur_gamma = load_alpha(parser, gamma)
-        V.mul(cur_gamma)
-        V.sub((1-cur_gamma)*g)
-        W.add(cur_alpha * V.val)
-        learning_curve.append(loss(W.val, batches.all_idxs))
-
-    final_loss = loss(W.val, batches.all_idxs)
-    final_param = W.val
-
-    if only_forw:
-        return final_loss
-    
-    l_grad = grad(f)
-
-    d_w = l_grad(W.val,batches.all_idxs)
-    hessianvp = grad(lambda w, idx, d: np.dot(gradient(w,idx),d))
-
-    d_alpha, d_gamma = np.zeros(alphas.shape), np.zeros(gammas.shape)
-    d_v = np.zeros_like(w)
-
-    #backprop
-    for i, alpha, gamma, batch in iters[::-1]:
-        print(f'backprop step {i}')
-        cur_alpha = load_alpha(parser, alpha)
-        cur_gamma = load_alpha(parser, gamma)
-        for j, (ixs, _) in enumerate(parser.shape_idx.values()):
-                d_alpha[i,j] = np.dot(d_w[ixs], V.val[ixs])
-
-        #exact gradient descent reversion
-        g = gradient(W.val, batch)
-        W.sub(cur_alpha * V.val)
-        V.add((1-cur_gamma)*g)
-        V.div(cur_gamma)
-
-        d_v += cur_alpha*d_w
-        for j, (ixs, _) in enumerate(parser.shape_idx.values()):
-                d_gamma[i,j] = np.dot(d_v[ixs], V.val[ixs] + g[ixs])
-        #d_gamma[i] = np.dot(d_v,V.val+g)
-        d_w -= (1-cur_gamma)*hessianvp(W.val, batch, d_v)
-        d_v *= cur_gamma
-
-        print('end backprop')
-
-    return {'learning curve': learning_curve,
-            'loss':final_loss,
-            'param': final_param,
-            'hg_w':d_w,
-            'hg_v': d_v,
-            'hg_gamma':d_gamma,
-            'hg_alpha':d_alpha   }
 
 
 def L2_RMD(loss, f , T, batches, w0, v0, gammas, alphas,  meta):
