@@ -26,8 +26,6 @@ N_classes = 10
 N_train = 10000
 N_valid = 10000
 N_tests = 10000
-#N_learning_checkpoint = 10
-#thin = np.ceil(N_iters/N_learning_checkpoint)
 
 # ----- Initial values of learned hyper-parameters -----
 init_log_L2_reg = -100.0
@@ -85,21 +83,15 @@ def hyper_grad_lr(hyperparam_vec, i_hyper):
 
         w = np.copy(stack[check]['weights'])
         v = np.copy(stack[check]['velocity'])
-        #print(f'valore di v che viene caricato dal ckp {check} prima di forward {nfrom} --> {nto-1}')
-        #print(v[0])
         for i, alpha, gamma in iters[nfrom:nto]:
 
             g = L_grad(w, i)
             cur_alpha_vect = fill_parser(parser, alpha)
             cur_gamma_vect = fill_parser(parser, gamma)
 
-
             v *= cur_gamma_vect
             v -= (1 - cur_gamma_vect) * g
             w += cur_alpha_vect * v
-            #print(f'v al forward step {i}')
-            #print(v[0])
-
 
         return w, v
 
@@ -116,9 +108,6 @@ def hyper_grad_lr(hyperparam_vec, i_hyper):
         i, alpha, gamma = iters[iteration]
 
         #print(f'backprop step {i}')
-        #print(f'v al backprop step {i}')
-        #print(v[0])
-
 
         cur_alpha_vect = fill_parser(parser, alpha)
         cur_gamma_vect = fill_parser(parser, gamma)
@@ -159,25 +148,21 @@ def hyper_grad_lr(hyperparam_vec, i_hyper):
             stack[scheduler.check]['weights']  = np.copy(w)
             stack[scheduler.check]['velocity'] = np.copy(v)
             
-            #print(v[0])
         elif action == ActionType.firsturn:
             print('executing first reverse step')
-            wF, vF = forward(scheduler.check, scheduler.oldcapo, nSteps)
+            wF_1, vF_1 = forward(scheduler.check, scheduler.oldcapo, nSteps-1)
+            wF, vF = forward(scheduler.check,scheduler.oldcapo, nSteps)
+
             final_loss = f(wF)
             #initialise gradient values
             d_alpha, d_gamma = np.zeros(alphas.shape), np.zeros(gammas.shape)
             d_w = f_grad(wF)
             d_v = np.zeros(d_w.shape)
             #print('valore che deve andare dentro a d_alpha')
-            #print(vF[0])
-            d_w, d_v, d_alpha, d_gamma = reverse(nSteps-1, wF, vF, d_w, d_v, d_alpha, d_gamma)
-            #for j, (_, (ixs, _)) in enumerate(parser.idxs_and_shapes.items()):
-            #    d_alpha[nSteps-1,j] = np.dot(d_w[ixs], vF[ixs])
+            d_w, d_v, d_alpha, d_gamma = reverse(nSteps-1, wF_1, vF_1, d_w, d_v, d_alpha, d_gamma)
         elif action == ActionType.restore:
             #print(f'loading state number {scheduler.check}')
             w, v = np.copy(stack[scheduler.check]['weights']), np.copy(stack[scheduler.check]['velocity'])
-            #print('valore di v che viene richiamato con restore')
-            #print(v[0])
         elif action == ActionType.youturn:
             #print(f' doing reverse step at time {scheduler.fine}')
             d_w, d_v, d_alpha, d_gamma = reverse(scheduler.fine, w, v, d_w, d_v, d_alpha, d_gamma)
@@ -194,13 +179,13 @@ def hyper_grad_lr(hyperparam_vec, i_hyper):
 
 
 
-initial_hypergrad = (hyperparams.vect, 0)
+initial_hypergrad = hyper_grad_lr(hyperparams.vect, 0)
 hyper = np.zeros((N_meta_iter, len(initial_hypergrad)))
 for i in range(N_meta_iter):
     print(f'--------META ITERATION {i}--------------')
-    hyper[i] = hyper_grad_lr( hyperparams.vect, i)
-    
-avg_hypergrad = np.mean(hyper, axis=0)
+    hyper[i] = hyper_grad_lr(hyperparams.vect, i)
+
+avg_hypergrad        = np.mean(hyper, axis=0)
 parsed_avg_hypergrad = hyperparams.new_vect(avg_hypergrad)
 
 

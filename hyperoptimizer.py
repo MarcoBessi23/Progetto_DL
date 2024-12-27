@@ -109,7 +109,7 @@ def RMD_parsed(parser, hyper_vect, loss, f):
         W.add(cur_alpha_vect * V.val)
 
     w_final = W.val
-    f_grad  = grad(f)    #f corrisponde alla validation loss del paper, non nostro caso è la training loss
+    f_grad  = grad(f)       #f corrisponde alla validation loss del paper, nel nostro caso è la training loss
     d_w     = f_grad(W.val) #Questa la calcolano su tutto il training set, quindi non devo fornire indici
 
     d_alphas, d_gammas = np.zeros(alphas.shape), np.zeros(gammas.shape)
@@ -288,6 +288,7 @@ def hyper_adam(grad, x, num_iters=100,
          step_size = 0.1, b1 = 0.1, b2 = 0.01, eps = 10**-4, lam=10**-4):
     """Adam as described in http://arxiv.org/pdf/1412.6980.pdf.
     It's basically RMSprop with momentum and some correction terms."""
+
     m = np.zeros(len(x))
     v = np.zeros(len(x))
     for i in range(num_iters):
@@ -301,3 +302,25 @@ def hyper_adam(grad, x, num_iters=100,
         vhat = v/(1-(1-b2)**(i+1))
         x -= step_size*mhat/(np.sqrt(vhat) + eps)
     return x
+
+
+
+def hyper_adam_list(grad, x, num_iters=100,
+         step_size = 0.1, b1 = 0.1, b2 = 0.01, eps = 10**-4, lam=10**-4):
+    """Adam as described in http://arxiv.org/pdf/1412.6980.pdf.
+    It's basically RMSprop with momentum and some correction terms."""
+    list = []
+    m = np.zeros(len(x))
+    v = np.zeros(len(x))
+    for i in range(num_iters):
+        print(f'::::::::::::::META ITERATION {i}::::::::::::::::::::')
+        list.append(x)
+        b1t = 1 - (1-b1)*(lam**i)
+        g = grad(x, i)
+
+        m = b1t*g     + (1-b1t)*m   # First  moment estimate
+        v = b2*(g**2) + (1-b2)*v    # Second moment estimate
+        mhat = m/(1-(1-b1)**(i+1))  # Bias correction
+        vhat = v/(1-(1-b2)**(i+1))
+        x -= step_size*mhat/(np.sqrt(vhat) + eps)
+    return x, list
