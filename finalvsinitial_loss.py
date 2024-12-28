@@ -20,8 +20,8 @@ def d_logit(x):
 
 
 layer_sizes = [784, 50, 50, 50, 10]
-batch_size  = 200
-N_iters   = 100
+batch_size = 200
+N_iters = 100
 N_classes = 10
 N_train = 10000
 N_valid = 10000
@@ -50,18 +50,15 @@ fixed_hyperparams['log_L2_reg'] = np.full(N_weight_types, init_log_L2_reg)
 hypergrads = VectorParser()
 
 loss_final = []
+learning_curves = {}
 def f_loss(w):
     return loss_fun(w, **train_data)
 
-
-list = []
 def hyper_gradient(hyperparams_vec, i_hyper):
     '''
     This function takes the hyperparameter vector, the meta iteration and outputs the hypergradient 
     '''
     cur_hyperparams = hyperparams.new_vect(hyperparams_vec)
-    list.append(cur_hyperparams['log_param_scale'].copy())
-    print(cur_hyperparams['log_param_scale'])
     rs = RandomState((seed, i_hyper))
     W0 = fill_parser(parser, np.exp(cur_hyperparams['log_param_scale']))
     W0 *= rs.randn(W0.size)
@@ -75,7 +72,11 @@ def hyper_gradient(hyperparams_vec, i_hyper):
         return loss_fun(w, train_data['X'][idxs], train_data['T'][idxs], L2_reg)
 
     hyper_list = [W0, alphas, gammas]
-    res = RMD_parsed(parser, hyper_list, indexed_loss_fun, f_loss) # al posto di training_set e all_idxs
+    res = RMD_parsed_record(parser, hyper_list, indexed_loss_fun, f_loss) 
+    if i_hyper == 1:
+        learning_curves['first_loss'] = res[-1]
+    if i_hyper == N_meta_iter-1:
+        learning_curves['final_loss'] = res[-1]
     weights_grad = parser.new_vect(W0 * res[0])
     hypergrads['log_param_scale'] = [np.sum(weights_grad[name])
                                      for name in weights_grad.names]
@@ -83,59 +84,11 @@ def hyper_gradient(hyperparams_vec, i_hyper):
     hypergrads['invlogit_gammas'] = (res[2] * d_logit(cur_hyperparams['invlogit_gammas']))
     loss_final.append(f_loss(res[3]))
 
-
     return hypergrads.vect
 
 
 final_result = hyper_adam(hyper_gradient, hyperparams.vect, N_meta_iter, meta_alpha)
-final_hyper  = hyperparams.new_vect(final_result)
 
-#colors = ['blue', 'green', 'red', 'deepskyblue']
-#index = 0
-#for cur_results, name in zip(final_hyper['log_alphas'].T, parser.names):
-#    if name[0] == 'weights':
-#        plt.plot(np.exp(cur_results), 'o-', color = colors[index], markeredgecolor='black' )
-#        print(colors[index])
-#        print(name)
-#        index += 1
-#
-#plt.show()
-
-fig = plt.figure(1)
-fig.clf()
-ax = fig.add_subplot()
-
-colors = ['blue', 'green', 'red', 'deepskyblue']
-index  = 0
-
-ax         = fig.add_subplot()
-list       = np.array(list).T
-for i, (y, name) in enumerate(zip(list, parser.names) ):
-    if name[0] == 'weights':
-        ax.plot(np.exp(y), 'o-', color = colors[index], markeredgecolor='black')
-        index +=1
-
-ax.set_xlabel('Meta iteration')
-ax.set_ylim(0,0.25)
-y1 = 1.0/np.sqrt(layer_sizes[0])
-y2 = 1.0/np.sqrt(layer_sizes[1])
-ax.plot(ax.get_xlim(), (y2, y2), 'k--') #, label=r'$1/\sqrt{50}$')
-ax.plot(ax.get_xlim(), (y1, y1), 'b--') #, label=r'$1/\sqrt{784}$')
-ax.set_yticks([0.00, 1.0/np.sqrt(784), 0.10, 1.0/np.sqrt(50), 0.20, 0.25])
-ax.set_yticklabels(['0.00', r"$1 / \sqrt{784}$", "0.10",
-                    r"$1 / \sqrt{50}$", "0.20", "0.25"])
-
-plt.savefig('/home/marco/Documenti/Progetto_DL/initial_weights/weights_exact_rep.png')
-
-
-fig.clf()
-ax = fig.add_subplot(111)
-index = 0
-for i, (y, name) in enumerate(zip(list, parser.names) ):
-    if name[0] == 'biases':
-        ax.plot(np.exp(y), 'o-', color = colors[index], markeredgecolor='black')
-        index +=1
-ax.set_xlabel('Meta iteration')
-ax.set_ylabel('Initial scale')
-
-plt.savefig('/home/marco/Documenti/Progetto_DL/initial_weights/bias_exact_rep.png')
+plt.plot(learning_curves['first_loss'], color = 'blue')
+plt.plot(learning_curves['final_loss'], color = 'green')
+plt.savefig('/home/marco/Documenti/Progetto_DL/results_learning_rate/initialvsfinal_exact.png')

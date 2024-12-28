@@ -141,6 +141,58 @@ def RMD_parsed(parser, hyper_vect, loss, f):
     assert np.all(ExactRep(w0).val == W.val)
     return d_w, d_alphas, d_gammas, w_final
 
+def RMD_parsed_record(parser, hyper_vect, loss, f):
+
+    w0, alphas, gammas = hyper_vect
+    W, V   = ExactRep(w0), ExactRep(np.zeros(w0.size))
+    iters  = list(zip(range(len(alphas)), alphas, gammas))
+    L_grad = grad(loss)
+    learning_curve = []
+    learning_curve.append(f(W.val))
+    for i, alpha, gamma in iters:
+        print(f'forward step {i}')
+        g = L_grad(W.val, i)
+        cur_alpha_vect = fill_parser(parser, alpha)
+        cur_gamma_vect = fill_parser(parser, gamma)
+        V.mul(cur_gamma_vect)
+        V.sub((1-cur_gamma_vect)*g)
+        W.add(cur_alpha_vect * V.val)
+        learning_curve.append(f(W.val))
+
+    w_final = W.val
+    f_grad  = grad(f)       #f corrisponde alla validation loss del paper, nel nostro caso è la training loss
+    d_w     = f_grad(W.val) #Questa la calcolano su tutto il training set, quindi non devo fornire indici
+
+    d_alphas, d_gammas = np.zeros(alphas.shape), np.zeros(gammas.shape)
+    d_v = np.zeros(d_w.shape)
+    grad_proj = lambda w, d, i: np.dot(L_grad(w, i), d)
+    L_hvp_w   = grad(grad_proj, 0)    # Returns a size(w) output.
+    #L_hvp_meta = grad(grad_proj, 1)  # Returns a size(meta) output.
+
+    for i, alpha, gamma in iters[::-1]:
+        print(f'back step{i}')
+        cur_alpha_vect = fill_parser(parser, alpha)
+        cur_gamma_vect = fill_parser(parser, gamma)
+        for j, (_, (ixs, _)) in enumerate(parser.idxs_and_shapes.items()):
+            d_alphas[i,j] = np.dot(d_w[ixs], V.val[ixs])
+
+        W.sub(cur_alpha_vect * V.val)                        # Reverse position update
+        g = L_grad(W.val, i)                                 # Evaluate gradient
+        V.add((1.0 - cur_gamma_vect) * g)
+        V.div(cur_gamma_vect)                                # Reverse momentum update
+        d_v += d_w * cur_alpha_vect
+
+        for j, (_, (ixs, _)) in enumerate(parser.idxs_and_shapes.items()):
+            d_gammas[i,j] = np.dot(d_v[ixs], V.val[ixs] + g[ixs])
+
+        d_w    -= L_hvp_w(W.val, (1.0 - cur_gamma_vect)*d_v, i)
+        d_v    *= cur_gamma_vect
+
+
+    assert np.all(ExactRep(w0).val == W.val)
+    return d_w, d_alphas, d_gammas, w_final, learning_curve
+
+
 
 def L2_RMD(loss, f , T, batches, w0, v0, gammas, alphas,  meta):
 

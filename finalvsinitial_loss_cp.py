@@ -58,6 +58,7 @@ L2_reg = fill_parser(parser, np.exp(fixed_hyperparams['log_L2_reg']))
 #def indexed_loss_fun(w, idxs):
 #    return loss_fun(w,  X = train_data['X'][idxs], T = train_data['T'][idxs], L2_reg = L2_reg)
 
+learning_curves = {}
 loss_final = []
 def f_loss(w):
     return loss_fun(w, **train_data)
@@ -96,8 +97,32 @@ def hyper_grad_lr(hyperparam_vec, i_hyper):
     iters     = list(zip(range(len(alphas)), alphas, gammas))
     L_grad    = grad(loss)
     f_grad    = grad(f)
-
     w, v      = np.copy(w_0), np.copy(v_0)
+    
+
+    def record_learning_curve():
+        wt, vt = np.copy(w_0), np.copy(v_0)
+        learning_curve = []
+        learning_curve.append(f(wt))
+        for i, alpha, gamma in iters:
+
+            g = L_grad(wt, i)
+            cur_alpha_vect = fill_parser(parser, alpha)
+            cur_gamma_vect = fill_parser(parser, gamma)
+
+            vt *= cur_gamma_vect
+            vt -= (1 - cur_gamma_vect) * g
+            wt += cur_alpha_vect * vt
+            #print(f'v al forward step {i}')
+            #print(v[0:4])
+            learning_curve.append(f(wt))
+
+        return learning_curve
+
+    if i_hyper == 1:
+        learning_curves['first_loss']= record_learning_curve() 
+    if i_hyper == N_meta_iter-1:
+        learning_curves['final_loss']= record_learning_curve()
 
     def forward(check:int, nfrom: int, nto: int):
 
@@ -111,13 +136,11 @@ def hyper_grad_lr(hyperparam_vec, i_hyper):
             cur_alpha_vect = fill_parser(parser, alpha)
             cur_gamma_vect = fill_parser(parser, gamma)
 
-
             v *= cur_gamma_vect
             v -= (1 - cur_gamma_vect) * g
             w += cur_alpha_vect * v
             #print(f'v al forward step {i}')
             #print(v[0:4])
-
 
         return w, v
 
@@ -137,7 +160,6 @@ def hyper_grad_lr(hyperparam_vec, i_hyper):
         #print(f'v al backprop step {i}')
         #print(v[0:4])
         
-        
         cur_alpha_vect = fill_parser(parser, alpha)
         cur_gamma_vect = fill_parser(parser, gamma)
         
@@ -151,11 +173,8 @@ def hyper_grad_lr(hyperparam_vec, i_hyper):
 
         for j, (_, (ixs, _)) in enumerate(parser.idxs_and_shapes.items()):
             d_alpha[i,j] = np.dot(d_w[ixs], v_next[ixs])
-
-        ##Questi tre passaggi non devono essere fatti e i valori vanno ottenuti tramite checkpoint
         
         d_v += d_w * cur_alpha_vect
-
 
         for j, (_, (ixs, _)) in enumerate(parser.idxs_and_shapes.items()):
                 d_gamma[i,j] = np.dot(d_v[ixs], v[ixs] + g[ixs])
@@ -179,10 +198,10 @@ def hyper_grad_lr(hyperparam_vec, i_hyper):
             
             #print(v[0:4])
         elif action == ActionType.firsturn:
+
             print('executing first reverse step')
             wF_1, vF_1 = forward(scheduler.check, scheduler.oldcapo, nSteps-1)
             wF, vF = forward(scheduler.check,scheduler.oldcapo, nSteps)
-
             final_loss = f(wF)
             loss_final.append(final_loss)
             #initialise gradient values
@@ -199,7 +218,7 @@ def hyper_grad_lr(hyperparam_vec, i_hyper):
         elif action == ActionType.youturn:
             #print(f' doing reverse step at time {scheduler.fine}')
             d_w, d_v, d_alpha, d_gamma = reverse(scheduler.fine, w, v, d_w, d_v, d_alpha, d_gamma)
-        if action == ActionType.terminate:
+        if action == ActionType.terminate: 
             break
 
     weights_grad = parser.new_vect(w_0 * d_w)
@@ -210,49 +229,49 @@ def hyper_grad_lr(hyperparam_vec, i_hyper):
     
     return hypergrads.vect           
 
+#def record_learning_curve(hyperparam_vec, i_hyper):
+#        learning_curve = []
+#        cur_hyper = hyperparams.new_vect(hyperparam_vec)
+#        rs        = RandomState((seed, i_hyper))
+#        w_0       = fill_parser(parser, np.exp(cur_hyper['log_param_scale']))
+#        w_0      *= rs.randn(w_0.size)
+#        v_0       = np.zeros_like(w_0)
+#        L2_reg    = fill_parser(parser, np.exp(fixed_hyperparams['log_L2_reg']))
+#        loss = indexed_loss_fun
+#        f = f_loss
+#
+#        alphas    = np.exp(cur_hyper['log_alphas'])
+#        gammas    = logit(cur_hyper['invlogit_gammas'])
+#        iters     = list(zip(range(len(alphas)), alphas, gammas))
+#        L_grad    = grad(loss)
+#        f_grad    = grad(f)
+#        wt, vt = np.copy(w_0), np.copy(v_0)
+#        learning_curve.append(f(wt))
+#        for i, alpha, gamma in iters:
+#
+#            g = L_grad(wt, i)
+#            cur_alpha_vect = fill_parser(parser, alpha)
+#            cur_gamma_vect = fill_parser(parser, gamma)
+#
+#            vt *= cur_gamma_vect
+#            vt -= (1 - cur_gamma_vect) * g
+#            wt += cur_alpha_vect * vt
+#            #print(f'v al forward step {i}')
+#            #print(v[0:4])
+#            learning_curve.append(f(wt))
+#
+#        return learning_curve
 
+
+#initial_result = hyper_adam(hyper_grad_lr, hyperparams.vect, N_meta_iter, meta_alpha)
+#initial_hyper  = hyperparams.new_vect(initial_result)
 
 
 final_result = hyper_adam(hyper_grad_lr, hyperparams.vect, N_meta_iter, meta_alpha)
 final_hyper  = hyperparams.new_vect(final_result)
 
 
-learning_path  = '/home/marco/Documenti/Progetto_DL/results_learning_rate/learning_schedule_cp.png'
 
-colors = ['blue', 'green', 'red', 'deepskyblue']
-index = 0
-for cur_results, name in zip(final_hyper['log_alphas'].T, parser.names):
-    if name[0] == 'weights':
-        plt.plot(np.exp(cur_results), 'o-', color = colors[index], markeredgecolor='black' )
-        print(colors[index])
-        print(name)
-        index += 1
-
-plt.xlabel('Schedule index', fontdict={'family': 'serif', 'size': 12})
-plt.ylabel('Learning rate', fontdict={'family': 'serif', 'size': 12})
-plt.savefig(learning_path, dpi=300)
-plt.close()
-
-
-folder_path = '/home/marco/Documenti/Progetto_DL/results_learning_rate'
-meta_learning_curve = os.path.join(folder_path, "meta_learning_cp.png")
-plt.plot(loss_final, marker = 'o', color = 'blue', markeredgecolor = 'black')
-
-plt.xlabel('meta iteration', fontdict={'family': 'serif', 'size': 12})
-plt.ylabel('loss', fontdict={'family': 'serif', 'size': 12})
-
-plt.savefig(meta_learning_curve, dpi=300)
-plt.close()
-
-
-#import matplotlib.ticker as ticker
-#loss_vector = np.array(vect) 
-#x = np.arange(len(loss_vector))
-#plt.plot(x, loss_vector, marker = 'o', color = 'blue', markeredgecolor = 'black')
-#plt.xlabel('meta iteration', fontdict={'family': 'serif', 'size': 12})
-#plt.ylabel('loss', fontdict={'family': 'serif', 'size': 12})
-#plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(lambda x,_: f'{x:.1f}'))
-#plt.gca().yaxis.set_major_locator(ticker.MultipleLocator(0.1))
-#_,high = plt.gca().get_ylim()
-#plt.gca().set_ylim([0, high])
-#plt.show()
+plt.plot(learning_curves['first_loss'], color = 'blue')
+plt.plot(learning_curves['final_loss'], color = 'green')
+plt.savefig('/home/marco/Documenti/Progetto_DL/results_learning_rate/initialvsfinal_cp.png')
