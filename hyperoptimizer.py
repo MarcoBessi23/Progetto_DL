@@ -142,7 +142,9 @@ def RMD_parsed(parser, hyper_vect, loss, f):
     return d_w, d_alphas, d_gammas, w_final
 
 def RMD_parsed_record(parser, hyper_vect, loss, f):
-
+    '''
+    Same as RMD_parsed but also training learning curve is returned
+    '''
     w0, alphas, gammas = hyper_vect
     W, V   = ExactRep(w0), ExactRep(np.zeros(w0.size))
     iters  = list(zip(range(len(alphas)), alphas, gammas))
@@ -161,13 +163,14 @@ def RMD_parsed_record(parser, hyper_vect, loss, f):
 
     w_final = W.val
     f_grad  = grad(f)       #f corrisponde alla validation loss del paper, nel nostro caso è la training loss
-    d_w     = f_grad(W.val) #Questa la calcolano su tutto il training set, quindi non devo fornire indici
+    d_w     = f_grad(W.val) #Questo valore è calcolato su tutto il training set, quindi non devo fornire indici usati nel fwd
 
     d_alphas, d_gammas = np.zeros(alphas.shape), np.zeros(gammas.shape)
     d_v = np.zeros(d_w.shape)
     grad_proj = lambda w, d, i: np.dot(L_grad(w, i), d)
-    L_hvp_w   = grad(grad_proj, 0)    # Returns a size(w) output.
-    #L_hvp_meta = grad(grad_proj, 1)  # Returns a size(meta) output.
+    L_hvp_w   = grad(grad_proj, 0)
+    #L_hvp_meta = grad(grad_proj, 1)  #not necessary
+
 
     for i, alpha, gamma in iters[::-1]:
         print(f'back step{i}')
@@ -359,8 +362,7 @@ def hyper_adam(grad, x, num_iters=100,
 
 def hyper_adam_list(grad, x, num_iters=100,
          step_size = 0.1, b1 = 0.1, b2 = 0.01, eps = 10**-4, lam=10**-4):
-    """Adam as described in http://arxiv.org/pdf/1412.6980.pdf.
-    It's basically RMSprop with momentum and some correction terms."""
+    
     list = []
     m = np.zeros(len(x))
     v = np.zeros(len(x))

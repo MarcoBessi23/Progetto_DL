@@ -20,13 +20,11 @@ def d_logit(x):
 # ----- Fixed params -----
 layer_sizes = [784, 50, 50, 50, 10]
 batch_size = 200
-N_iters = 10 #100
+N_iters = 100
 N_classes = 10
 N_train = 10000
 N_valid = 10000
 N_tests = 10000
-#N_learning_checkpoint = 10
-#thin = np.ceil(N_iters/N_learning_checkpoint)
 
 # ----- Initial values of learned hyper-parameters -----
 init_log_L2_reg = -100.0
@@ -35,7 +33,7 @@ init_invlogit_gammas = inv_logit(0.5)
 init_log_param_scale = -3.0
 
 # ----- Superparameters -----
-N_meta_iter = 4 #50
+N_meta_iter = 50
 seed = 0
 
 train_data, valid_data, tests_data = load_data_dicts(N_train, N_valid, N_tests)
@@ -81,8 +79,9 @@ def hyper_gradient(hyperparams_vec, i_hyper):
 
 initial_hypergrad = hyper_gradient(hyperparams.vect, 0)
 hyper = np.zeros((N_meta_iter, len(initial_hypergrad)))
+
 for i in range(N_meta_iter):
-    print(i)
+    print(f'Meta iteration number {i}')
     hyper[i] = hyper_gradient( hyperparams.vect, i)
     
 avg_hypergrad = np.mean(hyper, axis=0)
@@ -93,21 +92,20 @@ fig = plt.figure(0)
 fig.clf()
 ax = fig.add_subplot(111)
 
-#ax = fig.add_subplot(111)
 colors = ['blue', 'green', 'red', 'deepskyblue']
 def layer_name(weight_key):
     return "Layer {num}".format(num=weight_key[1] + 1)
 index = 0
 for cur_results, name in zip(parsed_avg_hypergrad['log_alphas'].T, parser.names):
     if name[0] == 'weights':
-        ax.plot(cur_results, 'o-', label=layer_name(name), color = colors[index], markeredgecolor = 'black')
+        ax.plot(cur_results, 'o-',  color = colors[index], markeredgecolor = 'black') #label=layer_name(name),
         index += 1
         print(np.shape(cur_results))
-#low, high = ax.get_ylim()
-#ax.set_ylim([0, high])
-#ax.set_ylabel('Learning rate Gradient')
-#ax.set_xlabel('Schedule index')
-#ax.set_yticks([0,])
-#ax.set_yticklabels(['0',])
-#fig.set_size_inches((6,2.5))
-#plt.savefig('/home/marco/Documenti/Progetto_DL/initial_hyper_values/exact_rep.png')
+
+ax.set_ylabel('Learning rate Gradient')
+ax.set_xlabel('Schedule index')
+ax.set_yticks([0,])
+ax.set_yticklabels(['0',])
+fig.set_size_inches((6,2.5))
+
+plt.savefig('/home/marco/Documenti/Progetto_DL/initial_hyper_values/exact_rep.png')

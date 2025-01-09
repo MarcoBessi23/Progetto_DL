@@ -4,10 +4,6 @@ from enum import IntEnum
 from abc import ABCMeta
 
 
-"""
-In the following I try to implement Hyper Grad without using the exact representation but
-by taking the forward steps (training the parameters) multiple times and saving the checkpoints
-"""
 
 """
 For each interval actually under consideration, revolve
@@ -17,10 +13,11 @@ next checkpoint will be set
 checkup = 10
 repsup = 64
 
-
+#p(m, s) = t*m - beta(s+1, t-1)
 def numforw(steps, snaps):
     """
-    return the number of forward steps from steps and num
+    return the number of extra forward steps from steps and num checkpoints as stated 
+    in proposition 1 of Revolve paper
     """
     if snaps < 1:
         print("Error: snaps < 1")
@@ -45,10 +42,12 @@ def numforw(steps, snaps):
     return num
 
 def maxrange(ss, tt):
-    
+    '''
+    Returns maximal lenght reversible with a maximum of t steps and s checkpoints as stated in Revolve paper
+    '''
     
     if tt < 0 or ss < 0:
-        print("Error in MAXRANGE: negative parameter")
+        print("Error in maxrange: negative parameter")
         return -1
 
     res = 1.0 
@@ -58,7 +57,7 @@ def maxrange(ss, tt):
         res /= i
  
     #ires = beta(ss, tt)
-    ires = int(res) 
+    ires = int(res)
     return ires
 
 def adjust(n_iter):
@@ -87,8 +86,8 @@ def adjust(n_iter):
     
     # Riduci snaps o reps finché maxrange è maggiore o uguale a `n_iter`
     while maxrange(snaps, reps) >= n_iter:
-        #qua si riducono in maniera alternata snaps e reps, perché si parte con snaps = reps e 
-        #poi snaps= reps +1 e poi di nuovo snaps = reps
+        # qua si riducono in maniera alternata snaps e reps, perché si parte con snaps = reps , a seguire 
+        # snaps = reps +1 e così via
         if snaps > reps:
             snaps -= 1
             s = 0
@@ -117,9 +116,9 @@ class ActionType(IntEnum):
 class Checkpoint:
     def __init__(self, snaps):
         """
-        Inizializza l'oggetto Checkpoint.
+        Initialize Checkpoint object.
         Args:
-            snaps (int): Numero di snapshot da gestire.
+            snaps (int): number of snapshot to use.
         """
         self.ch = [0] * snaps
         self.number_of_reads = [0] * snaps
@@ -138,7 +137,7 @@ class BinomialCKP():
     self.snaps : number of checkpoints you want to use with limit self.checkup
 
     '''    
-    def __init__(self, st, f=None):
+    def __init__(self, st):
 
         self.snaps = adjust(st)
         self.checkpoint = Checkpoint(self.snaps)    
@@ -150,7 +149,6 @@ class BinomialCKP():
         self.oldcapo = 0
         self.checkup = 100
         self.repsup = 1000
-        self.info = 3
         self.oldsnaps = self.snaps
 
     def revolve(self):
@@ -204,15 +202,11 @@ class BinomialCKP():
                 self.check = 0
                 self.oldsnaps = self.snaps
                 if self.snaps > self.checkup:
-                    self.info = 14
-                    print(14)
                     return ActionType.error
 
                 if self.info > 0:
                     num = numforw(self.fine - self.capo, self.snaps)
                     if num == -1:
-                        self.info = 12
-                        print(12)
                         return ActionType.error
                     print(f" prediction of needed forward steps: {num:8}")
                     print(f" slowdown factor: {num / (self.fine - self.capo):.4f}\n")
@@ -226,8 +220,6 @@ class BinomialCKP():
 
                 self.check += 1 #aggiungi un checkpoint
                 if self.check >= self.checkup or self.check + 1 > self.snaps:
-                    self.info = 10 if self.check >= self.checkup else 11
-                    print(10)
                     return ActionType.error
 
                 self.checkpoint.ch[self.check] = self.capo
@@ -239,15 +231,12 @@ class BinomialCKP():
             else:  # Advance
                 
                 if self.oldfine < self.fine and self.snaps == self.check + 1:
-                    self.info = 13
-                    print(13)
                     return ActionType.error
 
-                self.oldcapo = self.capo #add checkpoints to the list
+                self.oldcapo = self.capo     #aggiungo checkpoints alla lista
                 ds = self.snaps - self.check #numero di checkpoint che posso ancora aggiungere                
 
                 if ds < 1:
-                    self.info = 11
                     return ActionType.error
 
                 reps = 0
@@ -259,11 +248,9 @@ class BinomialCKP():
                 #range is equal to beta(ds,reps) where beta is binomial coefficient (ds+reps, reps)
 
                 if reps > self.repsup:
-                    self.info = 15
                     return ActionType.error
 
                 if self.snaps != self.oldsnaps and self.snaps > self.checkup:
-                    self.info = 14
                     return ActionType.error
 
                 bino1 = range_ * reps // (ds + reps) # bino1 = beta(ds, reps-1)

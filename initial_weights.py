@@ -90,16 +90,6 @@ def hyper_gradient(hyperparams_vec, i_hyper):
 final_result = hyper_adam(hyper_gradient, hyperparams.vect, N_meta_iter, meta_alpha)
 final_hyper  = hyperparams.new_vect(final_result)
 
-#colors = ['blue', 'green', 'red', 'deepskyblue']
-#index = 0
-#for cur_results, name in zip(final_hyper['log_alphas'].T, parser.names):
-#    if name[0] == 'weights':
-#        plt.plot(np.exp(cur_results), 'o-', color = colors[index], markeredgecolor='black' )
-#        print(colors[index])
-#        print(name)
-#        index += 1
-#
-#plt.show()
 
 fig = plt.figure(1)
 fig.clf()

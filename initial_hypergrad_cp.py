@@ -136,6 +136,7 @@ def hyper_grad_lr(hyperparam_vec, i_hyper):
 
         return d_w, d_v, d_alpha, d_gamma
 
+
     while(True):
         action = scheduler.revolve()
         #print(action)
@@ -210,12 +211,10 @@ ax.set_xlabel('Schedule index')
 ax.set_yticks([0,])
 ax.set_yticklabels(['0',])
 fig.set_size_inches((6,2.5))
-plt.savefig('/home/marco/Documenti/Progetto_DL/initial_hyper_values/checkpoint.png')
+#plt.savefig('/home/marco/Documenti/Progetto_DL/initial_hyper_values/checkpoint.png')
+plt.savefig('/home/marco/Documenti/Progetto_DL/initial_hyper_values/provach.png')
 
 
 #0       1       2       3       4       5       6       7       8       9      10
 0.0, 2.4985, 3.7483, 4.3730, 4.6854, 4.8416, 4.9197, 4.9587, 4.9782, 4.9880, 4.9929
-
-
-
 
