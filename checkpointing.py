@@ -68,26 +68,26 @@ def adjust(n_iter):
     reps = 1
     s = 0
 
-    # Primo ciclo: ridurre `s` finché maxrange supera `n_iter`
+    #first cycle: reduce 's' until maxrange exceeds 'n-iter'
     #while beta(snaps + s, reps + s)>n_iter
-    #questo while controlla se beta(1,1) > n_iter, beta(1,1) = 2.
+    #this while loop checks if beta(1,1) > n_iter, beta(1,1) = 2.
     while maxrange(snaps + s, reps + s) > n_iter:
         s -= 1
 
-    # Secondo ciclo: aumentare `s` finché maxrange è inferiore a `n_iter`
+    # second loop: increase `s` until maxrange is smaller than `n_iter`
     while maxrange(snaps + s, reps + s) < n_iter:
         s += 1
 
-    # Aggiorna snaps e reps
+    # update snaps and reps
     snaps += s
     reps += s
-    #in questo momento snaps = reps = s+1
+    #here we have snaps = reps = s+1
     s = -1
     
-    # Riduci snaps o reps finché maxrange è maggiore o uguale a `n_iter`
+    #reduce snaps or reps until maxrange is greater or equal to `n_iter`
     while maxrange(snaps, reps) >= n_iter:
-        # qua si riducono in maniera alternata snaps e reps, perché si parte con snaps = reps , a seguire 
-        # snaps = reps +1 e così via
+        # here snaps and reps are alternately reduced, indeed we start with snaps = reps , then 
+        # snaps = reps +1 and so on
         if snaps > reps:
             snaps -= 1
             s = 0
@@ -95,7 +95,7 @@ def adjust(n_iter):
             reps -= 1
             s = 1
 
-    # Correzione finale per snaps o reps
+    # final correction for snaps or reps
     if s == 0:
         snaps += 1
     elif s == 1:
@@ -165,11 +165,11 @@ class BinomialCKP():
             return ActionType.error
 
         if self.check == -1 and self.capo < self.fine:
-            self.turn = 0  # Inizializzazione del contatore di turn
+            self.turn = 0  # Inizialize the turn counter
             self.checkpoint.ch[0] = self.capo - 1
 
         diff = self.fine - self.capo
-        if diff == 0:  # Riduci capo al checkpoint precedente
+        if diff == 0:  # Reduce capo to previous checkpoint
             if self.check == -1 or self.capo == self.checkpoint.ch[0]:
                 if self.info > 0:
                     print(f"\n advances: {self.checkpoint.advances:5}")
@@ -178,16 +178,16 @@ class BinomialCKP():
                 return ActionType.terminate
             else:
 
-                self.capo = self.checkpoint.ch[self.check] #capo diventa il numero che c'è dentro all'ultimo checkpoint
+                self.capo = self.checkpoint.ch[self.check] #to capo is assigned the number inside the last checkpoint
                 self.oldfine = self.fine
                 self.checkpoint.number_of_reads[self.check] += 1
                 return ActionType.restore
 
-        elif diff == 1:  # passo combinato forward/reverse
+        elif diff == 1:  # combined forward/reverse step
             self.fine -= 1
             if self.check >= 0 and self.checkpoint.ch[self.check] == self.capo:
                 self.check -= 1
-            #controllo se è il primo passo di reverse 
+            #check if this is the firts reverse step 
             if self.turn == 0:
                 self.turn = 1
                 self.oldfine = self.fine
@@ -197,7 +197,7 @@ class BinomialCKP():
                 return ActionType.youturn
 
         else:
-            if self.check == -1:  # Inizializzazione
+            if self.check == -1:  # Inizialization
                 self.checkpoint.ch[0] = 0
                 self.check = 0
                 self.oldsnaps = self.snaps
@@ -218,7 +218,7 @@ class BinomialCKP():
 
             if self.checkpoint.ch[self.check] != self.capo:  # Takeshot
 
-                self.check += 1 #aggiungi un checkpoint
+                self.check += 1 #add a checkpoint
                 if self.check >= self.checkup or self.check + 1 > self.snaps:
                     return ActionType.error
 
@@ -233,8 +233,8 @@ class BinomialCKP():
                 if self.oldfine < self.fine and self.snaps == self.check + 1:
                     return ActionType.error
 
-                self.oldcapo = self.capo     #aggiungo checkpoints alla lista
-                ds = self.snaps - self.check #numero di checkpoint che posso ancora aggiungere                
+                self.oldcapo = self.capo     #add checkpoints to the list
+                ds = self.snaps - self.check #number of checkpoints I can still add                
 
                 if ds < 1:
                     return ActionType.error

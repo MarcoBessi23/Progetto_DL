@@ -128,8 +128,6 @@ def hyper_grad_lr(hyperparam_vec, i_hyper):
 
         w = np.copy(stack[check]['weights'])
         v = np.copy(stack[check]['velocity'])
-        #print(f'valore di v che viene caricato dal ckp {check} prima di forward {nfrom} --> {nto-1}')
-        #print(v[0:4])
         for i, alpha, gamma in iters[nfrom:nto]:
 
             g = L_grad(w, i)
@@ -139,9 +137,7 @@ def hyper_grad_lr(hyperparam_vec, i_hyper):
             v *= cur_gamma_vect
             v -= (1 - cur_gamma_vect) * g
             w += cur_alpha_vect * v
-            #print(f'v al forward step {i}')
-            #print(v[0:4])
-
+        
         return w, v
 
     def reverse(iteration, w, v, d_w, d_v, d_alpha, d_gamma):
@@ -157,8 +153,6 @@ def hyper_grad_lr(hyperparam_vec, i_hyper):
         i, alpha, gamma = iters[iteration]
 
         print(f'backprop step {i}')
-        #print(f'v al backprop step {i}')
-        #print(v[0:4])
         
         cur_alpha_vect = fill_parser(parser, alpha)
         cur_gamma_vect = fill_parser(parser, gamma)
@@ -168,9 +162,7 @@ def hyper_grad_lr(hyperparam_vec, i_hyper):
         v_next *= cur_gamma_vect
         v_next -= (1 - cur_gamma_vect) * g
 
-        #print(f'valore ricostruito di v al tempo {i+1}')
-        #print(v_next[0:4])
-
+        
         for j, (_, (ixs, _)) in enumerate(parser.idxs_and_shapes.items()):
             d_alpha[i,j] = np.dot(d_w[ixs], v_next[ixs])
         

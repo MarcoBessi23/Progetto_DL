@@ -1,5 +1,4 @@
 """A multi-layer perceptron for classification of MNIST handwritten digits."""
-#import numpy as np
 import autograd.numpy as np 
 #import autograd.numpy.random as npr
 from autograd import grad

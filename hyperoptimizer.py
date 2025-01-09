@@ -341,8 +341,6 @@ def data_RMD(loss, f , T, batches, w0, v0, gammas, alphas,  meta):
 
 def hyper_adam(grad, x, num_iters=100,
          step_size = 0.1, b1 = 0.1, b2 = 0.01, eps = 10**-4, lam=10**-4):
-    """Adam as described in http://arxiv.org/pdf/1412.6980.pdf.
-    It's basically RMSprop with momentum and some correction terms."""
 
     m = np.zeros(len(x))
     v = np.zeros(len(x))

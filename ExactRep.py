@@ -59,7 +59,7 @@ class ExactRep(object):
 
     def float_to_rational(self, a):
         assert np.all(a > 0.0)
-        d = 2**16 // np.fix(a+1).astype(np.int64) # Uglier than it used to be: np.int(a + 1)
+        d = 2**16 // np.fix(a+1).astype(np.int64)
         n = np.fix(a * d + 1).astype(np.int64)
         return  n, d
 
