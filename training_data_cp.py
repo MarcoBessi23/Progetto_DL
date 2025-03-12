@@ -6,6 +6,8 @@ import autograd.numpy.random as npr
 from autograd import grad
 import matplotlib.pyplot as plt
 from checkpointing import BinomialCKP, adjust, maxrange, ActionType, numforw
+import os
+
 
 # ----- Initial values of continuous hyper-parameters -----
 init_log_L2_reg = np.log(0.01)
@@ -203,5 +205,6 @@ cax    = plot_images(images, ax, ims_per_row=5, padding=2)
 cbar   = fig.colorbar(cax, ticks=[immin, 0, immax], shrink=.7)
 cbar.ax.set_yticklabels(['{:2.2f}'.format(immin), '0', '{:2.2f}'.format(immax)])
 
-plt.savefig('/home/marco/Documenti/Progetto_DL/fakeData/fake_data_cp.png')
+path_data = os.path.join(os.getcwd(), 'fakeData', 'fake_data_cp.png')
+plt.savefig(path_data)
 plt.close()

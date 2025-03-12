@@ -266,4 +266,5 @@ final_hyper  = hyperparams.new_vect(final_result)
 
 plt.plot(learning_curves['first_loss'], color = 'blue')
 plt.plot(learning_curves['final_loss'], color = 'green')
-plt.savefig('/home/marco/Documenti/Progetto_DL/results_learning_rate/initialvsfinal_cp.png')
+path = os.path.join(os.getcwd(), 'results_learning_rate', 'initialvsfinal_cp.png')
+plt.savefig(path)

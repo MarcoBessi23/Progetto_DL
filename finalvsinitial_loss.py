@@ -91,4 +91,5 @@ final_result = hyper_adam(hyper_gradient, hyperparams.vect, N_meta_iter, meta_al
 
 plt.plot(learning_curves['first_loss'], color = 'blue')
 plt.plot(learning_curves['final_loss'], color = 'green')
-plt.savefig('/home/marco/Documenti/Progetto_DL/results_learning_rate/initialvsfinal_exact.png')
+path = os.path.join(os.getcwd(), 'results_learning_rate', 'initialvsfinal_exact.png')
+plt.savefig(path)

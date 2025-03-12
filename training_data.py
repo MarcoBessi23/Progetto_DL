@@ -114,6 +114,9 @@ cax    = plot_images(images, ax, ims_per_row=5, padding=2)
 cbar   = fig.colorbar(cax, ticks=[immin, 0, immax], shrink=.7)
 cbar.ax.set_yticklabels(['{:2.2f}'.format(immin), '0', '{:2.2f}'.format(immax)])
 
-plt.savefig('/home/marco/Documenti/Progetto_DL/fakeData/fake_data.png')
+import os
+path_data = os.path.join(os.getcwd(), 'fakeData', 'fake_data.png')
+plt.savefig(path_data)
+
 plt.close()
 

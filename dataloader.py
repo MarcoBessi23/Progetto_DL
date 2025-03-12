@@ -18,20 +18,20 @@ def mnist():
             magic, num_data, rows, cols = struct.unpack(">IIII", fh.read(16))
             return np.array(array.array("B", fh.read()), dtype=np.uint8).reshape(num_data, rows, cols)
 
-    train_images = parse_images("/home/marco/Documenti/data/MNIST/raw/train-images-idx3-ubyte.gz")
-    train_labels = parse_labels("/home/marco/Documenti/data/MNIST/raw/train-labels-idx1-ubyte.gz")
-    test_images = parse_images("/home/marco/Documenti/data/MNIST/raw/t10k-images-idx3-ubyte.gz")
-    test_labels = parse_labels("/home/marco/Documenti/data/MNIST/raw/t10k-labels-idx1-ubyte.gz")
+    train_images = parse_images("data/MNIST/raw/train-images-idx3-ubyte.gz")
+    train_labels = parse_labels("data/MNIST/raw/train-labels-idx1-ubyte.gz")
+    test_images = parse_images("data/MNIST/raw/t10k-images-idx3-ubyte.gz")
+    test_labels = parse_labels("data/MNIST/raw/t10k-labels-idx1-ubyte.gz")
 
     return train_images, train_labels, test_images, test_labels
 
 def lecun_gz_to_pickle():
     data = mnist()
-    with open("/home/marco/Documenti/MNISTpickle/mnist_data.pkl", "wb") as f:
+    with open("MNISTpickle/mnist_data.pkl", "wb") as f:
         pickle.dump(data, f, 1)
 
 def load_data(normalize=False):
-    with open("/home/marco/Documenti/MNISTpickle/mnist_data.pkl", 'rb') as f:
+    with open("MNISTpickle/mnist_data.pkl", 'rb') as f:
         train_images, train_labels, test_images, test_labels = pickle.load(f)
 
     one_hot = lambda x, K : np.array(x[:,None] == np.arange(K)[None, :], dtype=int)

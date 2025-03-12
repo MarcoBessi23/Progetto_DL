@@ -217,7 +217,7 @@ final_result = hyper_adam(hyper_grad_lr, hyperparams.vect, N_meta_iter, meta_alp
 final_hyper  = hyperparams.new_vect(final_result)
 
 
-learning_path  = '/home/marco/Documenti/Progetto_DL/results_learning_rate/learning_schedule_cp.png'
+learning_path  = os.path.join(os.getcwd(), "results_learning_rate", "learning_schedule_cp.png")
 
 colors = ['blue', 'green', 'red', 'deepskyblue']
 index = 0
@@ -234,8 +234,7 @@ plt.savefig(learning_path, dpi=300)
 plt.close()
 
 
-folder_path = '/home/marco/Documenti/Progetto_DL/results_learning_rate'
-meta_learning_curve = os.path.join(folder_path, "meta_learning_cp.png")
+meta_learning_curve = os.path.join(os.getcwd(), "results_learning_rate" ,"meta_learning_cp.png")
 plt.plot(loss_final, marker = 'o', color = 'blue', markeredgecolor = 'black')
 
 plt.xlabel('meta iteration', fontdict={'family': 'serif', 'size': 12})

@@ -6,7 +6,7 @@ import autograd.numpy.random as npr
 from autograd import grad
 import matplotlib.pyplot as plt
 from checkpointing import BinomialCKP, adjust, maxrange, ActionType, numforw
-
+import os
 
 def logit(x):
     return 1 / (1 + np.exp(-x))
@@ -204,7 +204,11 @@ ax.plot(ax.get_xlim(), (y1, y1), 'b--') #, label=r'$1/\sqrt{784}$')
 ax.set_yticks([0.00, 1.0/np.sqrt(784), 0.10, 1.0/np.sqrt(50), 0.20, 0.25])
 ax.set_yticklabels(['0.00', r"$1 / \sqrt{784}$", "0.10",
                     r"$1 / \sqrt{50}$", "0.20", "0.25"])
-plt.savefig('/home/marco/Documenti/Progetto_DL/initial_weights/weights_cp.png')
+
+
+
+path1 = os.path.join(os.getcwd(), 'initial_weights', 'weights_cp.png')
+plt.savefig(path1)
 
 
 fig.clf()
@@ -218,4 +222,7 @@ ax.set_xlabel('Meta iteration')
 ax.set_ylabel('Initial scale')
 
 
-plt.savefig('/home/marco/Documenti/Progetto_DL/initial_weights/bias_cp.png')
+
+
+path2 = os.path.join(os.getcwd(), 'initial_weights', 'bias_cp.png')
+plt.savefig(path2)

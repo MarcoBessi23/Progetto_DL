@@ -86,8 +86,8 @@ final_result = hyper_adam(hyper_gradient, hyperparams.vect, N_meta_iter, meta_al
 final_hyper  = hyperparams.new_vect(final_result)
 
 
-folder_path            = '/home/marco/Documenti/Progetto_DL/results_learning_rate'
-alphabeta_schedule     = os.path.join(folder_path, "learning_schedule_exact.png")
+
+alphabeta_schedule     = os.path.join(os.getcwd(),'results_learning_rate', "learning_schedule_exact.png")
 
 
 colors = ['blue', 'green', 'red', 'deepskyblue']
@@ -104,7 +104,7 @@ plt.ylabel('Learning rate', fontdict={'family': 'serif', 'size': 12})
 plt.savefig(alphabeta_schedule, dpi=300)
 plt.close()
 
-meta_training_loss = '/home/marco/Documenti/Progetto_DL/results_learning_rate/meta_training_loss.png'
+meta_training_loss = os.path.join(os.getcwd(), "results_learning_rate", "meta_training_loss.png")
 plt.plot(loss_final, marker = 'o', color = 'blue', markeredgecolor = 'black')
 plt.xlabel('meta iteration', fontdict={'family': 'serif', 'size': 12})
 plt.ylabel('loss', fontdict={'family': 'serif', 'size': 12})

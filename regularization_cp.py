@@ -6,7 +6,7 @@ import autograd.numpy.random as npr
 from autograd import grad
 import matplotlib.pyplot as plt
 from checkpointing import BinomialCKP, adjust, maxrange, ActionType, numforw
-
+import os
 
 # Not going to learn:
 velocity_scale = 0.0
@@ -185,5 +185,7 @@ cax  = plot_images(images, ax, ims_per_row=5, padding=2, vmin=0.0)
 cbar = fig.colorbar(cax, ticks=[0, newmax], shrink=.7)
 cbar.ax.set_yticklabels(['0', '{:2.2f}'.format(newmax)])
 
-plt.savefig("/home/marco/Documenti/Progetto_DL/regularization/penalties_cp.png")
+
+path_reg = os.path.join(os.getcwd(), 'regularization', 'penalties_cp.png')
+plt.savefig(path_reg)
 

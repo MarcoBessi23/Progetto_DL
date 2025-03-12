@@ -95,5 +95,6 @@ images[over_ixs] = newmax
 cax  = plot_images(images, ax, ims_per_row=5, padding=2, vmin=0.0)
 cbar = fig.colorbar(cax, ticks=[0, newmax], shrink=.7)
 cbar.ax.set_yticklabels(['0', '{:2.2f}'.format(newmax)])
-
-plt.savefig("/home/marco/Documenti/Progetto_DL/regularization/penalties.png")
+import os
+path_reg = os.path.join(os.getcwd(), 'regularization', 'penalties.png')
+plt.savefig(path_reg)

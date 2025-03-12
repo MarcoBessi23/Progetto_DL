@@ -108,4 +108,6 @@ ax.set_yticks([0,])
 ax.set_yticklabels(['0',])
 fig.set_size_inches((6,2.5))
 
-plt.savefig('/home/marco/Documenti/Progetto_DL/initial_hyper_values/exact_rep.png')
+import os
+path = os.path.join(os.getcwd(), 'initial_hyper_values', 'exact_rep.png')
+plt.savefig(path)

@@ -211,10 +211,8 @@ ax.set_xlabel('Schedule index')
 ax.set_yticks([0,])
 ax.set_yticklabels(['0',])
 fig.set_size_inches((6,2.5))
-#plt.savefig('/home/marco/Documenti/Progetto_DL/initial_hyper_values/checkpoint.png')
-plt.savefig('/home/marco/Documenti/Progetto_DL/initial_hyper_values/provach.png')
 
-
-#0       1       2       3       4       5       6       7       8       9      10
-0.0, 2.4985, 3.7483, 4.3730, 4.6854, 4.8416, 4.9197, 4.9587, 4.9782, 4.9880, 4.9929
+import os
+path = os.path.join(os.getcwd(), 'initial_hyper_values', 'checkpoint.png')
+plt.savefig(path)
 

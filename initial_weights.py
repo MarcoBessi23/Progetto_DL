@@ -115,8 +115,8 @@ ax.set_yticks([0.00, 1.0/np.sqrt(784), 0.10, 1.0/np.sqrt(50), 0.20, 0.25])
 ax.set_yticklabels(['0.00', r"$1 / \sqrt{784}$", "0.10",
                     r"$1 / \sqrt{50}$", "0.20", "0.25"])
 
-plt.savefig('/home/marco/Documenti/Progetto_DL/initial_weights/weights_exact_rep.png')
-
+path1 = os.path.join(os.getcwd(), 'initial_weights', 'weights_exact_rep.png')
+plt.savefig(path1)
 
 fig.clf()
 ax = fig.add_subplot(111)
@@ -128,4 +128,5 @@ for i, (y, name) in enumerate(zip(list, parser.names) ):
 ax.set_xlabel('Meta iteration')
 ax.set_ylabel('Initial scale')
 
-plt.savefig('/home/marco/Documenti/Progetto_DL/initial_weights/bias_exact_rep.png')
+path2 = os.path.join(os.getcwd(), 'initial_weights', 'bias_exact_rep.png')
+plt.savefig(path2)
